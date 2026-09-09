@@ -1,0 +1,22 @@
+# secrets
+.env
+.env.local
+.env.*.local
+
+# dependencies
+node_modules/
+
+# build
+dist/
+build/
+coverage/
+
+# logs and OS
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# editors
+.idea/
+*.swp

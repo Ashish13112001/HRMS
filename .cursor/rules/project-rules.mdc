@@ -1,0 +1,888 @@
+# Project Rules
+
+## 1. Project Context
+
+This project is a **Multi-Tenant SaaS Employee Management System (HRMS)**.
+
+The project uses:
+
+* Frontend: React + TypeScript
+* Backend: Node.js + Express + TypeScript
+* Database: PostgreSQL
+* ORM: Prisma
+* API Style: REST
+* Architecture: Multi-Tenant Modular Monolith
+
+---
+
+# 2. Documentation Rules
+
+Before making implementation changes, understand the relevant documentation:
+
+```text
+docs/REQUIREMENTS.md
+docs/PLAN.md
+docs/IMPLEMENTATION.md
+```
+
+### Documentation Responsibilities
+
+* `REQUIREMENTS.md` defines **WHAT** the system must do.
+* `PLAN.md` defines **HOW and WHEN** the system should be built.
+* `IMPLEMENTATION.md` records **WHAT has actually been implemented**.
+
+Do not treat `IMPLEMENTATION.md` as a future plan.
+
+Only record completed functionality there after it has actually been implemented and verified.
+
+---
+
+# 3. Incremental Development
+
+The application must be developed **phase-by-phase**.
+
+### Rules
+
+* Implement only the requested phase/task.
+* Do not implement the entire application at once.
+* Do not automatically start future phases.
+* Do not add features that are outside the current task.
+* Do not skip required dependencies.
+* Complete and verify the current task before moving to the next task.
+
+If the user asks to implement Phase 1, do not implement Phase 2 or later phases unless explicitly requested.
+
+---
+
+# 4. Requirements Compliance
+
+`docs/REQUIREMENTS.md` is the primary source of truth for functional requirements.
+
+Before implementing a feature:
+
+1. Check the relevant requirement.
+2. Check the corresponding plan.
+3. Understand dependencies.
+4. Implement the requested scope.
+5. Test the implementation.
+6. Update `IMPLEMENTATION.md`.
+
+Do not silently change or remove requirements.
+
+If the implementation needs to differ from the requirements:
+
+* Explain the difference.
+* Do not make a major architectural change without approval.
+* Record the deviation in `IMPLEMENTATION.md`.
+
+---
+
+# 5. Architecture Rules
+
+Use a **Modular Monolith** architecture.
+
+Keep business domains separated into modules.
+
+Backend modules should generally follow:
+
+```text
+modules/
+├── auth/
+├── organizations/
+├── users/
+├── roles/
+├── permissions/
+├── employees/
+├── departments/
+├── teams/
+├── leaves/
+├── projects/
+└── tasks/
+```
+
+Avoid creating a large collection of unrelated files without clear module ownership.
+
+Keep responsibilities separated:
+
+```text
+Route
+  ↓
+Middleware
+  ↓
+Controller
+  ↓
+Service
+  ↓
+Repository / Data Access
+  ↓
+Database
+```
+
+Do not place large amounts of business logic directly inside routes.
+
+---
+
+# 6. Backend Rules
+
+Use:
+
+* Node.js
+* Express
+* TypeScript
+* Prisma
+* PostgreSQL
+* Zod
+
+### Backend requirements
+
+* Use TypeScript.
+* Keep business logic inside services.
+* Validate external input.
+* Use centralized error handling.
+* Use appropriate HTTP status codes.
+* Keep API responses consistent.
+* Do not expose sensitive implementation details.
+* Do not store passwords as plain text.
+* Do not hardcode secrets.
+* Do not bypass authorization checks.
+
+---
+
+# 7. API Rules
+
+Use API versioning:
+
+```text
+/api/v1
+```
+
+Follow REST principles.
+
+Example:
+
+```text
+GET    /api/v1/employees
+POST   /api/v1/employees
+GET    /api/v1/employees/:id
+PATCH  /api/v1/employees/:id
+```
+
+Use consistent response structures.
+
+### Success
+
+```json
+{
+  "success": true,
+  "data": {},
+  "message": "Employee retrieved successfully"
+}
+```
+
+### Error
+
+```json
+{
+  "success": false,
+  "message": "You do not have permission to perform this action",
+  "code": "FORBIDDEN"
+}
+```
+
+Do not introduce inconsistent response formats between modules.
+
+---
+
+# 8. Authentication Rules
+
+Authentication must be handled on the backend.
+
+Use:
+
+* JWT
+* Secure password hashing
+* Authentication middleware
+* Refresh-token strategy
+
+Never:
+
+* Store plain-text passwords.
+* Hardcode JWT secrets.
+* Trust user-provided identity information without verification.
+* Treat frontend authentication state as sufficient security.
+
+---
+
+# 9. Authorization & RBAC Rules
+
+The system uses Role-Based Access Control.
+
+Primary roles:
+
+```text
+Super Admin
+Organization Admin
+HR
+Project Manager
+Team Lead
+Employee
+```
+
+Authorization must be enforced on the **backend**.
+
+Frontend permission checks are only for UI/UX.
+
+They must never be considered a security boundary.
+
+Authorization should conceptually follow:
+
+```text
+Request
+  ↓
+Authentication
+  ↓
+Identify User
+  ↓
+Identify Organization
+  ↓
+Check Role
+  ↓
+Check Permission
+  ↓
+Check Tenant Access
+  ↓
+Business Logic
+  ↓
+Database
+```
+
+Unauthorized requests should return appropriate errors such as:
+
+```text
+401 Unauthorized
+403 Forbidden
+```
+
+---
+
+# 10. Multi-Tenancy Rules
+
+Tenant isolation is a **critical security requirement**.
+
+The application uses logical tenant isolation.
+
+Tenant-owned records must be associated with an organization.
+
+Examples:
+
+```text
+User
+Employee
+Department
+Team
+Leave
+Project
+Task
+```
+
+Tenant-aware queries must always respect the current organization.
+
+Never allow:
+
+```text
+Organization A
+        ↓
+Organization B data
+```
+
+A user from one organization must not be able to read, modify, or delete another organization's tenant-owned data.
+
+Always verify resource ownership before modifying tenant-owned resources.
+
+### Critical Rule
+
+Never rely only on a resource ID.
+
+Bad:
+
+```text
+findEmployeeById(employeeId)
+```
+
+Prefer tenant-aware access:
+
+```text
+findEmployeeByIdAndOrganization(
+    employeeId,
+    organizationId
+)
+```
+
+The exact implementation can vary, but the security principle must remain.
+
+---
+
+# 11. Database Rules
+
+Use:
+
+* PostgreSQL
+* Prisma
+
+Database changes must use Prisma migrations.
+
+Do not manually modify production database structure without a corresponding migration.
+
+Consider:
+
+* Foreign keys
+* Unique constraints
+* Indexes
+* Relationships
+* Tenant ownership
+* Created timestamps
+* Updated timestamps
+
+Avoid unnecessary database duplication.
+
+Do not modify existing schema relationships without checking their impact on existing modules.
+
+---
+
+# 12. Validation Rules
+
+Use Zod for external input validation.
+
+Validate:
+
+* Request body
+* Query parameters
+* Route parameters
+* Relevant form inputs
+
+Validation should happen before business logic.
+
+Conceptually:
+
+```text
+Request
+  ↓
+Validation
+  ↓
+Authorization
+  ↓
+Business Logic
+```
+
+Do not trust client-side validation alone.
+
+---
+
+# 13. Error Handling Rules
+
+Use centralized error handling.
+
+Handle common errors such as:
+
+```text
+400 Bad Request
+401 Unauthorized
+403 Forbidden
+404 Not Found
+409 Conflict
+422 Unprocessable Entity
+429 Too Many Requests
+500 Internal Server Error
+```
+
+Production errors must not expose:
+
+* Passwords
+* Tokens
+* Secrets
+* Database credentials
+* Internal stack traces
+* Sensitive implementation details
+
+---
+
+# 14. Frontend Rules
+
+Use:
+
+* React
+* TypeScript
+* React Router
+* TanStack Query
+* React Hook Form
+* Zod
+* Tailwind CSS
+
+Keep frontend code organized by feature.
+
+Preferred conceptual structure:
+
+```text
+src/
+├── components/
+├── pages/
+├── layouts/
+├── features/
+├── hooks/
+├── services/
+├── routes/
+├── schemas/
+├── types/
+└── utils/
+```
+
+Prefer reusable components over duplicated UI code.
+
+Handle:
+
+* Loading states
+* Error states
+* Empty states
+* Form validation
+* API errors
+* Permission-based UI
+
+---
+
+# 15. State Management Rules
+
+Use server-state management appropriately.
+
+Use TanStack Query for server/API state where appropriate.
+
+Do not introduce global state for every piece of data.
+
+Before adding a state-management library, check whether existing project tools are sufficient.
+
+Avoid unnecessary dependencies.
+
+---
+
+# 16. TypeScript Rules
+
+Use TypeScript throughout frontend and backend.
+
+Prefer explicit, meaningful types.
+
+Avoid:
+
+```typescript
+any
+```
+
+unless there is a valid technical reason.
+
+Do not disable TypeScript checks merely to make code compile.
+
+Prefer:
+
+```typescript
+unknown
+```
+
+with proper narrowing when the type is genuinely unknown.
+
+Keep shared types/interfaces organized appropriately.
+
+---
+
+# 17. Security Rules
+
+Security must be considered for every backend feature.
+
+Required principles:
+
+* Authentication
+* Authorization
+* RBAC
+* Tenant isolation
+* Input validation
+* Password hashing
+* Secret protection
+* Secure token handling
+* Helmet
+* CORS
+* Rate limiting
+
+Never:
+
+* Hardcode secrets.
+* Commit `.env`.
+* Return passwords.
+* Return sensitive tokens unnecessarily.
+* Trust client-provided organization IDs without authorization checks.
+* Bypass permission middleware.
+
+---
+
+# 18. Environment Variables
+
+Use environment variables for configuration and secrets.
+
+Example:
+
+```text
+NODE_ENV
+PORT
+DATABASE_URL
+JWT_SECRET
+JWT_REFRESH_SECRET
+CORS_ORIGIN
+```
+
+Rules:
+
+* `.env` must not be committed.
+* `.env.example` may be committed.
+* Never put real credentials in source code.
+* Never put real secrets in documentation.
+* Do not expose backend secrets to the frontend.
+
+---
+
+# 19. Code Quality Rules
+
+Prefer code that is:
+
+* Readable
+* Maintainable
+* Testable
+* Modular
+* Type-safe
+* Consistent
+
+Avoid:
+
+* Unnecessary abstraction
+* Over-engineering
+* Duplicate logic
+* Giant files
+* Giant functions
+* Deeply coupled modules
+* Unnecessary libraries
+
+Do not optimize prematurely.
+
+Prefer simple solutions that satisfy the current requirement.
+
+---
+
+# 20. Testing Rules
+
+Important business logic must be tested.
+
+Use:
+
+* Vitest
+* React Testing Library
+* Supertest
+
+Tests should cover where applicable:
+
+* Authentication
+* Authorization
+* RBAC
+* Validation
+* CRUD operations
+* Error handling
+* Tenant isolation
+* Critical business workflows
+
+### Mandatory Security Tests
+
+```text
+Employee → Approve Leave
+Expected → 403
+
+HR → Approve Leave
+Expected → Success
+
+Organization A → Read Organization B Employee
+Expected → Denied
+
+Organization A → Update Organization B Employee
+Expected → Denied
+```
+
+Do not mark security-critical functionality complete without appropriate tests.
+
+---
+
+# 21. Git Rules
+
+Use meaningful branch names.
+
+Examples:
+
+```text
+main
+develop
+
+feature/authentication
+feature/rbac
+feature/employee-management
+feature/leave-management
+
+fix/login-validation
+fix/tenant-isolation
+```
+
+Use meaningful commit messages.
+
+Examples:
+
+```text
+feat: add user authentication
+feat: implement employee CRUD
+fix: prevent cross-tenant employee access
+test: add leave authorization tests
+```
+
+Do not commit:
+
+* `.env`
+* Secrets
+* Passwords
+* Tokens
+* Generated sensitive files
+
+---
+
+# 22. Dependency Rules
+
+Before adding a new package:
+
+1. Check whether the project already has a package that solves the problem.
+2. Check whether the feature can reasonably be implemented without another dependency.
+3. Add a dependency only when it provides meaningful value.
+4. Avoid unnecessary libraries.
+
+Do not introduce Redis, queues, microservices, object storage, or other infrastructure unless the current requirement actually needs it.
+
+---
+
+# 23. MVP Scope Rules
+
+The current MVP does **not** include:
+
+* Payroll
+* Advanced attendance
+* Subscription billing
+* Advanced analytics
+* Advanced reporting
+* Advanced notifications
+* File/document management
+* Organization branding
+* Custom workflows
+* MFA/2FA
+* Advanced audit analytics
+
+Do not implement these features unless the requirements are explicitly changed.
+
+Future roadmap items should remain outside the current implementation.
+
+---
+
+# 24. Cursor Workflow Rules
+
+For every implementation request:
+
+```text
+1. Read project rules
+        ↓
+2. Check REQUIREMENTS.md
+        ↓
+3. Check relevant section of PLAN.md
+        ↓
+4. Inspect existing code
+        ↓
+5. Implement only requested scope
+        ↓
+6. Run appropriate tests/checks
+        ↓
+7. Fix issues
+        ↓
+8. Update IMPLEMENTATION.md
+```
+
+Before modifying existing code:
+
+* Inspect the current implementation.
+* Understand dependencies.
+* Avoid unnecessary rewrites.
+* Preserve working functionality.
+
+Do not recreate existing functionality without a reason.
+
+---
+
+# 25. Documentation Update Rules
+
+After meaningful implementation work, update:
+
+```text
+docs/IMPLEMENTATION.md
+```
+
+Record:
+
+* Implemented features
+* Files/modules added
+* Database changes
+* API changes
+* Tests added
+* Important decisions
+* Known issues
+* Deviations from the plan
+
+Do not mark a feature as completed until it has been implemented and verified.
+
+---
+
+# 26. Change Management
+
+If a requested change affects:
+
+* Architecture
+* Database design
+* Authentication
+* Authorization
+* Tenant isolation
+* API contracts
+* Major project structure
+* MVP scope
+
+First evaluate its impact.
+
+For significant changes:
+
+```text
+Requirement
+    ↓
+Impact Analysis
+    ↓
+Plan Update
+    ↓
+Implementation
+    ↓
+Testing
+    ↓
+Implementation Documentation
+```
+
+Do not silently introduce architectural changes.
+
+---
+
+# 27. No Unnecessary Changes
+
+When implementing a task:
+
+* Modify only relevant files.
+* Do not rewrite unrelated modules.
+* Do not rename files without a reason.
+* Do not change APIs unnecessarily.
+* Do not change database models unnecessarily.
+* Do not change dependencies unnecessarily.
+* Do not refactor unrelated code unless required for correctness.
+
+Keep changes focused and reviewable.
+
+---
+
+# 28. Definition of Done
+
+A task is considered complete when applicable requirements are satisfied:
+
+### Code
+
+* [ ] Implementation complete
+* [ ] Code follows project architecture
+* [ ] No unnecessary changes
+
+### Backend
+
+* [ ] Validation implemented
+* [ ] Authentication checked
+* [ ] Authorization checked
+* [ ] Tenant isolation checked
+* [ ] Error handling implemented
+
+### Frontend
+
+* [ ] UI implemented
+* [ ] Loading state handled
+* [ ] Error state handled
+* [ ] Validation handled
+
+### Database
+
+* [ ] Schema updated if required
+* [ ] Migration created if required
+* [ ] Relationships verified
+
+### Testing
+
+* [ ] Relevant tests added
+* [ ] Tests pass
+* [ ] Critical security rules verified
+
+### Documentation
+
+* [ ] `IMPLEMENTATION.md` updated
+* [ ] Important decisions documented
+* [ ] Deviations documented
+
+---
+
+# 29. Priority Rules
+
+When making implementation decisions, prioritize:
+
+```text
+1. Security
+2. Correctness
+3. Requirements
+4. Tenant Isolation
+5. Maintainability
+6. Testability
+7. Performance
+8. Developer Convenience
+```
+
+Security and tenant isolation must never be sacrificed for convenience.
+
+---
+
+# 30. Final Rule
+
+Always remember:
+
+```text
+REQUIREMENTS.md
+        ↓
+WHAT to build
+
+PLAN.md
+        ↓
+HOW / WHEN to build
+
+project-rules.mdc
+        ↓
+HOW Cursor should work
+
+IMPLEMENTATION.md
+        ↓
+WHAT has actually been built
+```
+
+Build the application **incrementally, securely, and according to the approved requirements and plan**.
+
+Never assume that a feature should be implemented simply because it may be useful.
+
+Implement what is requested, verify it, document it, and then move to the next phase.

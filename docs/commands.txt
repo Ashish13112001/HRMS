@@ -1,0 +1,9 @@
+//////////////////////////////////////////////////////////////////////
+
+Implement Phase 1 / Sprint 1 from `docs/PLAN.md`.
+
+Follow all applicable project rules and implement only Phase 1.
+
+After implementation, verify the work, fix any issues, update `docs/IMPLEMENTATION.md`, and stop.
+
+//////////////////////////////////////////////////////////////////////

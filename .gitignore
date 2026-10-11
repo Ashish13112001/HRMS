@@ -10,6 +10,7 @@ node_modules/
 dist/
 build/
 coverage/
+*.tsbuildinfo
 
 # logs and OS
 *.log
@@ -20,3 +21,4 @@ Thumbs.db
 # editors
 .idea/
 *.swp
+.eslintcache

@@ -1,0 +1,38 @@
+---
+description: Document new concepts in one docs/concepts/phase-N.txt file per phase
+alwaysApply: true
+---
+
+# Concept learning notes
+
+When introducing a new or important topic, technology, pattern, or architecture:
+
+1. Mention it in the reply in plain language (what it is and why it showed up).
+2. Use one file per phase: `docs/concepts/phase-1.txt`, `docs/concepts/phase-2.txt`, and so on.
+3. Do not create a separate .txt file per topic.
+4. Append new topics to that phase's file. Create the phase file only when that phase is in progress.
+5. Separate topics with a full line of equals signs:
+
+```text
+============================================================================================================================================
+```
+
+Each topic must stay short and use these headings:
+
+```text
+Topic name
+
+What is it?
+What does it do?
+Why do we need it?
+What are its benefits?
+What are the alternatives, if any?
+```
+
+Scope:
+
+- Document only topics this task actually introduces.
+- Skip topics already in that phase file.
+- Do not create files for future phases that were not implemented yet.
+
+Do not put these notes in `REQUIREMENTS.md`, `PLAN.md`, or `IMPLEMENTATION.md`.

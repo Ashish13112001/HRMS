@@ -329,55 +329,393 @@ Implement secure user authentication.
 
 Phase 1.
 
-## Tasks
+## How to implement
 
-### Database
+Do **not** implement all of Phase 2 in one step.
 
-* [ ] Create User model
-* [ ] Add authentication-related fields
-* [ ] Create migrations
+Work one ticket at a time (for example `P2-1.1`, then `P2-1.2`). Complete and verify the requested ticket before starting the next one.
 
-### Registration
+Phase 2 is split as:
 
-* [ ] Registration API
-* [ ] Registration validation
-* [ ] Password hashing
-* [ ] Duplicate email handling
+```text
+1 Epic
+  → 8 User Stories
+    → 18 Tickets
+```
 
-### Login
+## Epic
 
-* [ ] Login API
-* [ ] Credential validation
-* [ ] JWT access token
-* [ ] Refresh token strategy
+**Phase 2 — Authentication**
 
-### Authentication Middleware
+Users can register, log in, stay logged in, log out, and reset a password. Protected APIs reject missing or invalid tokens. Passwords are never stored in plain text.
 
-* [ ] Token extraction
-* [ ] Token verification
-* [ ] User identification
-* [ ] Authentication middleware
-* [ ] Protected routes
+Out of scope for this phase:
 
-### Logout
+* Organizations
+* Tenant isolation
+* Roles / RBAC
+* Employee profiles
+* Real email provider (unless separately approved)
 
-* [ ] Logout implementation
-* [ ] Refresh-token invalidation strategy
+---
 
-### Password Recovery
+## US-1 — Authentication Foundation
 
-* [ ] Forgot password flow
-* [ ] Reset password flow
-* [ ] Secure reset mechanism
+### P2-1.1 — Set Up Authentication Database with PostgreSQL and Prisma
 
-### Frontend
+**Summary:** Connect Prisma to PostgreSQL and create the `User` model.
 
-* [ ] Login page
-* [ ] Registration page
-* [ ] Authentication state
-* [ ] Protected routes
-* [ ] Logout flow
-* [ ] Authentication error handling
+**Depends on:** Phase 1
+
+* [ ] Configure Prisma with the existing PostgreSQL database
+* [ ] Create the `User` model with:
+
+```text
+id
+email
+passwordHash
+status
+organizationId   (nullable in Phase 2)
+role             (nullable in Phase 2)
+createdAt
+updatedAt
+```
+
+* [ ] Enforce unique email
+* [ ] Store passwords only as `passwordHash` (no plain-text password field)
+* [ ] Create and run the initial Prisma migration
+* [ ] Verify Prisma Client can access `User`
+
+**Acceptance**
+
+* Prisma connects to PostgreSQL
+* `User` exists in the database
+* Email is unique
+* Migration succeeds
+
+---
+
+### P2-1.2 — Set Up Authentication Module and Security Utilities
+
+**Summary:** Create the `auth` module plus password hashing and JWT helpers.
+
+**Depends on:** P2-1.1
+
+* [ ] Create the `auth` module (routes / controller / service) using the existing backend pattern
+* [ ] Password hashing and comparison
+* [ ] Access-token create and verify
+* [ ] Refresh-token create and verify
+* [ ] Load JWT secrets from environment variables
+* [ ] Keep helpers reusable for register, login, refresh, and password reset
+
+**Acceptance**
+
+* Passwords can be hashed and compared
+* Access and refresh tokens can be created and verified
+* Secrets are not hardcoded
+
+---
+
+### P2-1.3 — Add Authentication Utility Unit Tests
+
+**Summary:** Unit tests for hashing and JWT helpers.
+
+**Depends on:** P2-1.2
+
+* [ ] Hash and compare (correct and incorrect password)
+* [ ] Access-token create and verify
+* [ ] Refresh-token create and verify
+* [ ] Invalid and expired tokens are rejected
+
+**Acceptance**
+
+* Utility tests pass
+* Hashing never stores a plain-text password
+
+---
+
+## US-2 — User Signup
+
+### P2-2.1 — Implement User Registration API
+
+**API:** `POST /api/v1/auth/register`
+
+**Depends on:** P2-1.1, P2-1.2
+
+* [ ] Registration endpoint
+* [ ] Zod validation
+* [ ] Reject duplicate email
+* [ ] Hash password before save
+* [ ] Create user with Prisma
+* [ ] Do not return password or `passwordHash`
+
+**Acceptance**
+
+* Valid registration creates a user
+* Invalid data and duplicate email are rejected
+* Sensitive fields are not in the response
+
+---
+
+### P2-2.2 — Add User Registration API Tests
+
+**Depends on:** P2-2.1
+
+* [ ] Success
+* [ ] Invalid request data
+* [ ] Duplicate email
+* [ ] Password stored as hash and not returned
+* [ ] Correct HTTP status codes and error shape
+
+**Acceptance**
+
+* Registration tests pass
+* Sensitive password information is never exposed
+
+---
+
+## US-3 — User Login
+
+### P2-3.1 — Implement User Login with JWT Authentication
+
+**API:** `POST /api/v1/auth/login`
+
+**Depends on:** P2-1.2
+
+* [ ] Zod validation
+* [ ] Find user by email and compare password hash
+* [ ] Reject invalid credentials with a generic error
+* [ ] Check user status where applicable
+* [ ] Issue access token and refresh token
+* [ ] Store refresh-token / session data needed for refresh and logout
+* [ ] Do not return sensitive user fields
+
+**Acceptance**
+
+* Valid credentials authenticate and return tokens
+* Invalid credentials are rejected without revealing whether the email exists
+
+---
+
+### P2-3.2 — Add Login API Tests
+
+**Depends on:** P2-3.1
+
+* [ ] Successful login
+* [ ] Incorrect password
+* [ ] Unknown email
+* [ ] Invalid request data
+* [ ] Tokens returned; sensitive fields omitted; generic error for bad credentials
+
+**Acceptance**
+
+* Login tests pass
+* Invalid credentials cannot authenticate
+
+---
+
+## US-4 — Refresh Token
+
+### P2-4.1 — Implement Refresh Token Flow and Rotation
+
+**API:** `POST /api/v1/auth/refresh`
+
+**Depends on:** P2-3.1
+
+* [ ] Accept and verify the refresh token
+* [ ] Reject expired, invalid, revoked, or reused tokens
+* [ ] Rotate refresh token when required
+* [ ] Issue a new access token
+* [ ] Store new session state and invalidate the previous refresh token
+
+**Acceptance**
+
+* Valid refresh produces a new access token
+* Invalid / expired / revoked / rotated tokens cannot be reused
+
+---
+
+### P2-4.2 — Add Refresh Token Tests
+
+**Depends on:** P2-4.1
+
+* [ ] Successful refresh
+* [ ] Invalid, expired, and revoked tokens
+* [ ] Rotation; old token cannot be reused
+
+**Acceptance**
+
+* Refresh-token tests pass
+
+---
+
+## US-5 — Protect APIs
+
+### P2-5.1 — Implement Authentication Middleware and Protected `/me` API
+
+**API:** `GET /api/v1/auth/me`
+
+**Depends on:** P2-3.1
+
+* [ ] Auth middleware: read Bearer token, verify JWT, attach user to the request
+* [ ] Reject missing, invalid, or expired tokens
+* [ ] Protect `GET /api/v1/auth/me`
+* [ ] Keep `GET /api/v1/health` public
+
+**Acceptance**
+
+* `/auth/me` requires a valid access token
+* `/health` remains public
+
+---
+
+### P2-5.2 — Add Authentication Middleware Tests
+
+**Depends on:** P2-5.1
+
+* [ ] No token, malformed Bearer, invalid JWT, expired JWT, valid JWT
+* [ ] `/auth/me` returns the authenticated user
+* [ ] `/health` works without authentication
+
+**Acceptance**
+
+* Unauthorized requests are rejected
+* Public endpoints stay public
+
+---
+
+## US-6 — Logout
+
+### P2-6.1 — Implement User Logout and Session Invalidation
+
+**API:** `POST /api/v1/auth/logout`
+
+**Depends on:** P2-4.1
+
+* [ ] Identify the refresh session
+* [ ] Revoke / invalidate the refresh token
+* [ ] Safe logout response
+* [ ] Handle already-invalid sessions appropriately
+
+**Acceptance**
+
+* Logout succeeds
+* The logged-out refresh token cannot issue a new access token
+
+---
+
+### P2-6.2 — Add Logout and Session Invalidation Tests
+
+**Depends on:** P2-6.1
+
+* [ ] Successful logout
+* [ ] Refresh fails after logout
+* [ ] Logout with invalid / expired session
+
+**Acceptance**
+
+* Logout tests pass
+* Invalidated sessions cannot be refreshed
+
+---
+
+## US-7 — Forgot / Reset Password
+
+### P2-7.1 — Implement Forgot and Reset Password APIs
+
+**APIs:**
+
+```text
+POST /api/v1/auth/forgot-password
+POST /api/v1/auth/reset-password
+```
+
+**Depends on:** P2-1.2
+
+* [ ] Forgot-password: generic success whether or not the email exists
+* [ ] Generate a one-time reset token; persist only a hash; set expiry
+* [ ] Reset-password: validate token, hash new password, invalidate token
+* [ ] Reject expired or already-used tokens
+* [ ] Do not add a real email provider unless separately approved
+
+**Acceptance**
+
+* Forgot-password does not reveal account existence
+* Only the token hash is stored
+* Expired / used tokens are rejected
+* New password is hashed; reset token is invalid after success
+
+---
+
+### P2-7.2 — Add Password Recovery Tests
+
+**Depends on:** P2-7.1
+
+* [ ] Forgot-password generic response for existing and missing emails
+* [ ] Successful reset
+* [ ] Invalid, expired, and reused tokens
+* [ ] New password stored as hash; old password no longer authenticates
+
+**Acceptance**
+
+* Password recovery tests pass
+* Password is never stored in plain text
+
+---
+
+## US-8 — Authentication UI
+
+### P2-8.1 — Implement Signup and Login Pages
+
+**Depends on:** P2-2.1, P2-3.1
+
+* [ ] Signup page and login page
+* [ ] React Hook Form + Zod
+* [ ] Call register and login APIs
+* [ ] Loading, validation, and API error states
+* [ ] Successful login establishes the frontend session
+
+**Acceptance**
+
+* User can register and log in from the UI
+* Errors and loading states are shown
+
+---
+
+### P2-8.2 — Implement Authentication State, Protected Routes and API Authentication
+
+**Depends on:** P2-4.1, P2-5.1, P2-6.1
+
+* [ ] Auth state / session
+* [ ] Protected routes; guests redirect to login
+* [ ] Attach access token to authenticated API requests
+* [ ] Handle `401`; refresh access token when required
+* [ ] Frontend logout; clear session
+
+**Acceptance**
+
+* Authenticated users can open protected routes
+* Unauthenticated users are redirected to login
+* Logout clears the frontend session
+
+---
+
+### P2-8.3 — Add Authentication Frontend Tests
+
+**Depends on:** P2-8.1, P2-8.2
+
+* [ ] Signup and login validation
+* [ ] Login API error handling
+* [ ] Successful authentication
+* [ ] Protected-route redirect
+* [ ] Logout and auth state
+
+**Acceptance**
+
+* Frontend auth tests pass
+* Unauthenticated users cannot stay on protected routes
+
+---
 
 ## API
 
@@ -388,9 +726,46 @@ POST /api/v1/auth/logout
 POST /api/v1/auth/refresh
 POST /api/v1/auth/forgot-password
 POST /api/v1/auth/reset-password
+GET  /api/v1/auth/me
 ```
 
-## Acceptance Criteria
+`GET /api/v1/health` remains public.
+
+---
+
+## Ticket flow
+
+```text
+Foundation
+  P2-1.1 → P2-1.2 → P2-1.3
+
+Signup
+  P2-2.1 → P2-2.2
+
+Login
+  P2-3.1 → P2-3.2
+
+Refresh
+  P2-4.1 → P2-4.2
+
+Protected APIs
+  P2-5.1 → P2-5.2
+
+Logout
+  P2-6.1 → P2-6.2
+
+Password Recovery
+  P2-7.1 → P2-7.2
+
+Frontend
+  P2-8.1 → P2-8.2 → P2-8.3
+```
+
+**Total:** 1 Epic → 8 User Stories → 18 Tickets
+
+---
+
+## Phase acceptance criteria
 
 * [ ] Users can register
 * [ ] Users can log in
@@ -403,15 +778,15 @@ POST /api/v1/auth/reset-password
 * [ ] Password reset flow works
 * [ ] Sensitive information is not exposed
 
-## Testing
+## Completion
 
-* [ ] Registration tests
-* [ ] Login tests
-* [ ] Invalid credentials tests
-* [ ] Token tests
-* [ ] Protected route tests
-* [ ] Password hashing tests
-* [ ] Refresh-token tests
+After each ticket:
+
+1. Run the checks that ticket requires.
+2. Update `IMPLEMENTATION.md` for that ticket.
+3. Stop unless the next ticket is requested.
+
+After all Phase 2 tickets are done, only then begin Phase 3.
 
 ---
 
@@ -1225,15 +1600,16 @@ Deliverable:
 
 **25 SP**
 
-Focus:
+Focus (implement ticket by ticket, not the whole sprint at once):
 
-* Registration
-* Login
-* JWT
-* Refresh tokens
-* Logout
-* Password recovery
-* Protected routes
+* US-1 Authentication foundation (`P2-1.1` … `P2-1.3`)
+* US-2 Signup (`P2-2.1`, `P2-2.2`)
+* US-3 Login (`P2-3.1`, `P2-3.2`)
+* US-4 Refresh token (`P2-4.1`, `P2-4.2`)
+* US-5 Protect APIs (`P2-5.1`, `P2-5.2`)
+* US-6 Logout (`P2-6.1`, `P2-6.2`)
+* US-7 Forgot / reset password (`P2-7.1`, `P2-7.2`)
+* US-8 Authentication UI (`P2-8.1` … `P2-8.3`)
 
 Deliverable:
 
@@ -2018,23 +2394,21 @@ If a conflict is discovered:
 
 # 42. Initial Development State
 
-At project initialization:
-
 ```text
 Current Phase:
-Phase 1 — Project Foundation
+Phase 2 — Authentication
 
 Current Sprint:
-Sprint 1
+Sprint 2
 
 Overall Status:
-Not Started
+Phase 1 complete. Phase 2 not started.
 
 Next Objective:
-Initialize and configure the project foundation.
+Implement Phase 2 one ticket at a time, starting with P2-1.1.
 
 Next Step:
-Start Phase 1 implementation.
+Wait for the requested ticket (for example P2-1.1). Do not implement the whole phase at once.
 ```
 
 ---

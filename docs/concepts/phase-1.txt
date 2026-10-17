@@ -1,0 +1,218 @@
+Phase 1 — Project Foundation
+Concepts introduced while setting up the repo, client, and server.
+
+============================================================================================================================================
+npm workspaces
+
+What is it?
+A way for one Git repo to contain more than one npm package (here: client and server) that share a root install.
+
+What does it do?
+The root package.json lists workspaces. `npm install` at the repo root installs dependencies for both apps. Scripts like `npm run test` can run in every workspace.
+
+Why do we need it?
+This HRMS has a React frontend and an Express backend. Workspaces keep them separate projects while still being one repository.
+
+What are its benefits?
+One install command, shared Node version, simpler local development, and a clear client/server split.
+
+What are the alternatives, if any?
+Two separate repos; a single mixed package with frontend and backend in one package.json; tools like Nx or Turborepo (heavier than we need for the MVP).
+
+============================================================================================================================================
+Modular monolith
+
+What is it?
+One backend application whose code is split into modules (health, later auth, employees, and so on) instead of many small microservices.
+
+What does it do?
+All APIs run in one Express process. Each business area lives in its own folder with routes, controllers, and services.
+
+Why do we need it?
+The MVP needs clear structure without the cost of deploying many services. Tenant isolation and RBAC still live in this one app.
+
+What are its benefits?
+Easier local setup, simpler debugging, one database, and we can extract a module later if scale requires it.
+
+What are the alternatives, if any?
+A single large "god" folder with no modules; microservices from day one (more ops work than the MVP needs).
+
+============================================================================================================================================
+REST API versioning
+
+What is it?
+Putting a version in the API path, such as /api/v1, so old and new clients can be supported later.
+
+What does it do?
+All current endpoints hang under /api/v1 (for example GET /api/v1/health). Future breaking changes can go to /api/v2 without instantly breaking v1 clients.
+
+Why do we need it?
+This is a SaaS API. Once organizations use it, changing response shapes without a version would break their apps.
+
+What are its benefits?
+Safe evolution of the API, a clear public contract, and room to migrate clients gradually.
+
+What are the alternatives, if any?
+No version in the URL (header versioning, or /api only). Those work but are easier to get wrong for a public REST API.
+
+============================================================================================================================================
+Health check
+
+What is it?
+A tiny public endpoint whose only job is to show that the API process is up.
+
+What does it do?
+GET /api/v1/health returns JSON like { success: true, data: { status: "ok", timestamp: "..." } }. It does not read employees or the database yet.
+
+Why do we need it?
+Phase 1 needed a real route to prove Express, versioning, and the frontend fetch path work before login and Prisma exist.
+
+What are its benefits?
+Fast smoke test for developers and, later, load balancers or monitors can ping it.
+
+What are the alternatives, if any?
+Hitting a random page; waiting until auth exists; a dedicated ops tool. A simple /health route is the usual first check.
+
+============================================================================================================================================
+Route → Controller → Service
+
+What is it?
+A layered pattern: the route declares the URL, the controller handles HTTP, the service holds business logic.
+
+What does it do?
+For health: health.routes.ts maps GET / to getHealth; the controller writes the JSON response; the service builds { status, timestamp }.
+
+Why do we need it?
+Project rules say not to put business logic in routes. This keeps each file small and the same shape for auth, employees, and leave later.
+
+What are its benefits?
+Easier tests (test the service without HTTP), clearer ownership, and new modules copy the same layout.
+
+What are the alternatives, if any?
+Fat routes that do everything; putting SQL in the controller. A later "repository" layer can sit under the service when the database arrives.
+
+============================================================================================================================================
+Zod
+
+What is it?
+A TypeScript library that describes data shapes and checks real values at runtime (forms, env vars, API JSON).
+
+What does it do?
+On the server it validates process.env before the app starts. On the client it parses the health payload so a bad response is rejected.
+
+Why do we need it?
+TypeScript types disappear at runtime. Anyone can send bad JSON or a missing PORT. Zod catches that before business logic runs.
+
+What are its benefits?
+One schema can infer TypeScript types and validate input. Errors are structured. The same idea will validate login and employee forms later.
+
+What are the alternatives, if any?
+Joi, Yup, Valibot, or hand-written if checks. Zod is the stack choice in REQUIREMENTS/PLAN.
+
+============================================================================================================================================
+Environment variables
+
+What is it?
+Configuration kept outside source code, usually in a local .env file (PORT, secrets, database URL).
+
+What does it do?
+dotenv loads the repo-root .env. The server validates required keys with Zod. The Vite client only reads VITE_ prefixed values (VITE_API_URL).
+
+Why do we need it?
+Secrets must not be committed. Each machine (and later production) can use different ports, URLs, and keys.
+
+What are its benefits?
+No hardcoded secrets, easy local setup via .env.example, and the frontend never receives JWT secrets.
+
+What are the alternatives, if any?
+Hardcoding config (unsafe); OS-level env only; secret managers in production (fine later, overkill for local Phase 1).
+
+============================================================================================================================================
+Helmet and CORS
+
+What is it?
+Helmet sets safer HTTP headers. CORS (Cross-Origin Resource Sharing) decides which browser origins may call the API.
+
+What does it do?
+Helmet reduces common header-related risks. CORS here allows the React app origin (CORS_ORIGIN, e.g. http://localhost:5173) to call the API on port 3000.
+
+Why do we need it?
+Browsers block cross-port requests unless the API sends CORS headers. APIs should also not leak extra fingerprinting via default headers.
+
+What are its benefits?
+Baseline API hardening with two small middleware. Matches the planned security stack without extra infrastructure.
+
+What are the alternatives, if any?
+Manual header code; a reverse proxy for CORS; same origin via a Vite proxy only (works in dev, not a full security story). Rate limiting is a later-phase extra.
+
+============================================================================================================================================
+Vite
+
+What is it?
+The frontend build tool and dev server for the React + TypeScript app.
+
+What does it do?
+`npm run dev:client` serves the app (default http://localhost:5173) with fast refresh. `npm run build` outputs production files in client/dist.
+
+Why do we need it?
+React cannot run in the browser as raw TypeScript. Vite compiles TS/TSX, CSS (Tailwind), and bundles for production.
+
+What are its benefits?
+Very fast local reloads, simple config, official React plugin, and Tailwind v4 via a Vite plugin.
+
+What are the alternatives, if any?
+Create React App (older), Webpack, Parcel, Next.js (adds extra framework we did not choose for this MVP).
+
+============================================================================================================================================
+React Router
+
+What is it?
+The library that maps URLs in the React app to pages (/, unknown paths, later /login).
+
+What does it do?
+AppRoutes wraps pages in a layout. `/` shows HomePage. Any other path shows NotFoundPage.
+
+Why do we need it?
+A single HTML file cannot express multiple screens by itself. The SPA needs a router for navigation without full page reloads.
+
+What are its benefits?
+Standard React navigation, nested layouts, and a place to add protected routes in the auth phase.
+
+What are the alternatives, if any?
+Next.js file-based routing; manually swapping views with useState (does not scale).
+
+============================================================================================================================================
+TanStack Query
+
+What is it?
+A library for server/API state in React: fetch, cache, loading, and error status.
+
+What does it do?
+HomePage uses useQuery to call GET /api/v1/health. It tracks isLoading, isError, and data without extra useState/useEffect boilerplate.
+
+Why do we need it?
+API data is not the same as local UI state. We will load lists (employees, leaves) repeatedly; a cache avoids refetch chaos.
+
+What are its benefits?
+Built-in loading/error handling, caching, and a pattern we can reuse for every screen that talks to the API.
+
+What are the alternatives, if any?
+Raw fetch in useEffect; Redux; SWR. TanStack Query is the stack choice in the plan.
+
+============================================================================================================================================
+Consistent API responses
+
+What is it?
+A shared JSON shape for every API success and error.
+
+What does it do?
+Success: { success: true, data, message }. Error: { success: false, message, code } with an HTTP status (404 NOT_FOUND, 500, later 401/403).
+
+Why do we need it?
+The React client can handle one format instead of a different shape per endpoint. Health already uses this contract.
+
+What are its benefits?
+Predictable frontend code, stable error codes, and no leaked stack traces in production.
+
+What are the alternatives, if any?
+Returning raw objects with no wrapper; GraphQL; wrapping only errors. Mixing formats is what we are avoiding.

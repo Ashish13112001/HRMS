@@ -367,8 +367,8 @@ Out of scope for this phase:
 
 **Depends on:** Phase 1
 
-* [ ] Configure Prisma with the existing PostgreSQL database
-* [ ] Create the `User` model with:
+* [x] Configure Prisma with the existing PostgreSQL database
+* [x] Create the `User` model with:
 
 ```text
 id
@@ -381,10 +381,10 @@ createdAt
 updatedAt
 ```
 
-* [ ] Enforce unique email
-* [ ] Store passwords only as `passwordHash` (no plain-text password field)
-* [ ] Create and run the initial Prisma migration
-* [ ] Verify Prisma Client can access `User`
+* [x] Enforce unique email
+* [x] Store passwords only as `passwordHash` (no plain-text password field)
+* [x] Create and run the initial Prisma migration
+* [x] Verify Prisma Client can access `User`
 
 **Acceptance**
 

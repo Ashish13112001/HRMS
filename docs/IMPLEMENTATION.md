@@ -29,8 +29,8 @@ It records:
 | Project Foundation      | Completed   |
 | Backend Setup           | Completed   |
 | Frontend Setup          | Completed   |
-| Database Setup          | Not Started |
-| Authentication          | Not Started |
+| Database Setup          | Completed   |
+| Authentication          | In Progress |
 | Organization Management | Not Started |
 | Multi-Tenancy           | Not Started |
 | User Management         | Not Started |
@@ -185,11 +185,18 @@ Set up the basic project structure and development environment.
 
 ### Status
 
-**Not Started**
+**In Progress**
 
 ### Objectives
 
 Implement secure user authentication.
+
+### Sub-Phase Tracking
+
+* [x] **P2-1.1 — Set Up Authentication Database with PostgreSQL and Prisma**: Connected Prisma 7 with PostgreSQL (Neon) using `@prisma/adapter-pg`. Created `User` model, generated and executed initial migration `20261025110316_init`, and verified Prisma Client operations.
+* [ ] P2-1.2 — Set Up Authentication Module and Security Utilities
+* [ ] P2-1.3 — Add Authentication Utility Unit Tests
+
 
 ### Implementation Tasks
 
@@ -684,14 +691,14 @@ COMPLETED
 
 ### Status
 
-**Not Started**
+**Completed**
 
 ### Models
 
 | Model        | Status      |
 | ------------ | ----------- |
 | Organization | Not Started |
-| User         | Not Started |
+| User         | Completed   |
 | Role         | Not Started |
 | Permission   | Not Started |
 | Employee     | Not Started |
@@ -704,28 +711,28 @@ COMPLETED
 
 ### Database Requirements
 
-* [ ] Primary keys
+* [x] Primary keys (`users.id`)
 * [ ] Foreign keys
 * [ ] Required relationships
 * [ ] Organization/tenant relationships
-* [ ] Unique constraints
-* [ ] Appropriate indexes
-* [ ] Created timestamps
-* [ ] Updated timestamps
-* [ ] Database migrations
+* [x] Unique constraints (`users.email`)
+* [x] Appropriate indexes (unique index on `email`)
+* [x] Created timestamps (`users.created_at`)
+* [x] Updated timestamps (`users.updated_at`)
+* [x] Database migrations (Prisma migrate)
 * [ ] Seed data where required
 
 ### Migration Tracking
 
-| Migration           | Purpose                    | Status      |
-| ------------------- | -------------------------- | ----------- |
-| Initial migration   | Initial database structure | Not Started |
-| Authentication      | Auth-related changes       | Not Started |
-| RBAC                | Roles and permissions      | Not Started |
-| Employee management | Employee-related tables    | Not Started |
-| Departments & teams | Department/team tables     | Not Started |
-| Leave management    | Leave-related tables       | Not Started |
-| Projects & tasks    | Project/task tables        | Not Started |
+| Migration           | Purpose                                  | Status    |
+| ------------------- | ---------------------------------------- | --------- |
+| `20261025110316_init` | Initial migration: create `users` table with email index | Completed |
+| Authentication      | Auth-related changes                     | Not Started |
+| RBAC                | Roles and permissions                    | Not Started |
+| Employee management | Employee-related tables                  | Not Started |
+| Departments & teams | Department/team tables                   | Not Started |
+| Leave management    | Leave-related tables                     | Not Started |
+| Projects & tasks    | Project/task tables                      | Not Started |
 
 > Update this table with the actual migration names created by Prisma.
 
@@ -1014,6 +1021,7 @@ server/src/
 ## Integration/API Tests
 
 * [x] Health endpoint
+* [x] Database & Prisma User model integration (prisma.test.ts)
 * [ ] Authentication endpoints
 * [ ] Organization endpoints
 * [ ] User endpoints
@@ -1093,8 +1101,8 @@ This section records important implementation decisions made during development.
 | Env files at repository root    | One `.env` / `.env.example` for local client and server config | 2026-09-10 |
 | Prisma deferred to later phases | Phase 1 only needs a validated `DATABASE_URL`, not a live schema | 2026-09-10 |
 | Helmet + CORS on the API now    | Baseline HTTP hardening for the Express foundation             | 2026-09-10 |
-| PostgreSQL                      | Relational data model and transactional requirements           | TBD        |
-| Prisma                          | Type-safe database access and migrations                       | TBD        |
+| PostgreSQL (Neon)               | Relational data model and PostgreSQL database for SaaS multi-tenancy | 2026-10-25 |
+| Prisma 7 + `@prisma/adapter-pg` | Type-safe ORM using TypeScript config (`prisma.config.ts`) and PG driver adapter | 2026-10-25 |
 | React + TypeScript              | Frontend maintainability and type safety                       | 2026-09-10 |
 | Node.js + Express               | REST API implementation                                        | 2026-09-10 |
 | Backend RBAC                    | Security must be enforced server-side                          | TBD        |
@@ -1424,22 +1432,23 @@ When working with Cursor AI:
 Project: Multi-Tenant SaaS Employee Management System
 
 Current Phase:
-Phase 1 — Project Foundation (completed)
+Phase 2 — Authentication (In Progress)
 
 Overall Status:
-Phase 1 complete; later phases not started
+Phase 1 complete; Phase 2 in progress (P2-1.1 completed)
 
 Completed Features:
-Project foundation (client, server, env, health check)
+- Project foundation (client, server, env, health check)
+- Authentication database foundation (PostgreSQL + Prisma 7, User model, initial migration, PrismaClient integration)
 
 In Progress:
-0
+- Phase 2 — Authentication (P2-1.2: Authentication Module and Security Utilities)
 
 Blocked:
 0
 
 Next Objective:
-Phase 2 — Authentication (not started)
+P2-1.2 — Set Up Authentication Module and Security Utilities
 ```
 
 ---

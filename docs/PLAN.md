@@ -401,12 +401,12 @@ updatedAt
 
 **Depends on:** P2-1.1
 
-* [ ] Create the `auth` module (routes / controller / service) using the existing backend pattern
-* [ ] Password hashing and comparison
-* [ ] Access-token create and verify
-* [ ] Refresh-token create and verify
-* [ ] Load JWT secrets from environment variables
-* [ ] Keep helpers reusable for register, login, refresh, and password reset
+* [x] Create the `auth` module (routes / controller / service) using the existing backend pattern
+* [x] Password hashing and comparison
+* [x] Access-token create and verify
+* [x] Refresh-token create and verify
+* [x] Load JWT secrets from environment variables
+* [x] Keep helpers reusable for register, login, refresh, and password reset
 
 **Acceptance**
 
@@ -422,10 +422,10 @@ updatedAt
 
 **Depends on:** P2-1.2
 
-* [ ] Hash and compare (correct and incorrect password)
-* [ ] Access-token create and verify
-* [ ] Refresh-token create and verify
-* [ ] Invalid and expired tokens are rejected
+* [x] Hash and compare (correct and incorrect password)
+* [x] Access-token create and verify
+* [x] Refresh-token create and verify
+* [x] Invalid and expired tokens are rejected
 
 **Acceptance**
 
@@ -442,12 +442,12 @@ updatedAt
 
 **Depends on:** P2-1.1, P2-1.2
 
-* [ ] Registration endpoint
-* [ ] Zod validation
-* [ ] Reject duplicate email
-* [ ] Hash password before save
-* [ ] Create user with Prisma
-* [ ] Do not return password or `passwordHash`
+* [x] Registration endpoint
+* [x] Zod validation
+* [x] Reject duplicate email
+* [x] Hash password before save
+* [x] Create user with Prisma
+* [x] Do not return password or `passwordHash`
 
 **Acceptance**
 

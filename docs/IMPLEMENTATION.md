@@ -194,30 +194,32 @@ Implement secure user authentication.
 ### Sub-Phase Tracking
 
 * [x] **P2-1.1 — Set Up Authentication Database with PostgreSQL and Prisma**: Connected Prisma 7 with PostgreSQL (Neon) using `@prisma/adapter-pg`. Created `User` model, generated and executed initial migration `20261025110316_init`, and verified Prisma Client operations.
-* [ ] P2-1.2 — Set Up Authentication Module and Security Utilities
-* [ ] P2-1.3 — Add Authentication Utility Unit Tests
+* [x] **P2-1.2 — Set Up Authentication Module and Security Utilities**: Created auth module scaffold (routes/controller/service) mounted at `/api/v1/auth`. Implemented reusable bcrypt password hashing and comparison utilities, and jsonwebtoken access/refresh token generation and verification using environment variables.
+* [x] **P2-1.3 — Add Authentication Utility Unit Tests**: Comprehensive unit tests added in `auth.utils.test.ts` covering password hashing, unique salting, constant-time comparison, access token creation/verification, refresh token creation/verification, token expiration, secret boundary isolation, and tampered token rejection (14/14 tests passing).
+* [x] **P2-2.1 — Implement User Registration API**: Created `POST /api/v1/auth/register` with Zod validation (`validateBody(registerSchema)`), duplicate email check (409 Conflict), bcrypt password hashing, and sensitive field omission from the 201 response.
+* [ ] P2-2.2 — Add User Registration API Tests
 
 
 ### Implementation Tasks
 
-* [ ] User registration
+* [x] User registration
 * [ ] User login
-* [ ] Password hashing
-* [ ] JWT access token
-* [ ] Refresh token strategy
+* [x] Password hashing
+* [x] JWT access token
+* [x] Refresh token strategy
 * [ ] Authentication middleware
 * [ ] Protected routes
 * [ ] Logout
 * [ ] Forgot password
 * [ ] Reset password
-* [ ] Authentication validation
+* [x] Authentication validation
 * [ ] Authentication error handling
 
 ### API Implementation
 
 | Method | Endpoint                       | Status      |
 | ------ | ------------------------------ | ----------- |
-| POST   | `/api/v1/auth/register`        | Not Started |
+| POST   | `/api/v1/auth/register`        | Implemented |
 | POST   | `/api/v1/auth/login`           | Not Started |
 | POST   | `/api/v1/auth/logout`          | Not Started |
 | POST   | `/api/v1/auth/refresh`         | Not Started |
@@ -756,7 +758,7 @@ Base API path:
 
 | Endpoint                | Method | Status      |
 | ----------------------- | ------ | ----------- |
-| `/auth/register`        | POST   | Not Started |
+| `/auth/register`        | POST   | Implemented |
 | `/auth/login`           | POST   | Not Started |
 | `/auth/logout`          | POST   | Not Started |
 | `/auth/refresh`         | POST   | Not Started |
@@ -926,7 +928,7 @@ server/src/
 | ------------- | ----------- |
 | App / server  | Completed   |
 | Health        | Completed   |
-| Auth          | Not Started |
+| Auth          | In Progress |
 | Organizations | Not Started |
 | Users         | Not Started |
 | Roles         | Not Started |
@@ -944,24 +946,24 @@ server/src/
 
 ### Validation
 
-* [x] Zod schemas (environment and health payload)
-* [ ] Request body validation
+* [x] Zod schemas (environment, health payload, auth register payload)
+* [x] Request body validation (validateBody middleware)
 * [ ] Query parameter validation
 * [ ] Route parameter validation
-* [ ] Validation error responses
+* [x] Validation error responses (400 VALIDATION_ERROR)
 
 ### Error Handling
 
 * [x] Centralized error handler
 * [x] Standard error format
-* [x] Appropriate HTTP status codes (foundation: 404, 500, AppError)
+* [x] Appropriate HTTP status codes (foundation: 404, 500, AppError, 400 validation, 409 conflict)
 * [x] Production-safe error messages
 * [x] Not-found errors
 * [ ] Database error handling
 * [ ] Authentication errors
 * [ ] Authorization errors
-* [ ] Validation errors
-* [ ] Conflict errors
+* [x] Validation errors
+* [x] Conflict errors
 * [ ] Rate-limit errors
 
 ### Standard Success Response
@@ -990,10 +992,10 @@ server/src/
 
 | Security Requirement  | Status      |
 | --------------------- | ----------- |
-| Authentication        | Not Started |
-| Password Hashing      | Not Started |
-| JWT                   | Not Started |
-| Refresh Tokens        | Not Started |
+| Authentication        | In Progress |
+| Password Hashing      | Implemented |
+| JWT                   | Implemented |
+| Refresh Tokens        | Implemented |
 | Authorization         | Not Started |
 | RBAC                  | Not Started |
 | Tenant Isolation      | Not Started |
@@ -1010,7 +1012,8 @@ server/src/
 
 ## Unit Tests
 
-* [ ] Authentication logic
+* [x] Authentication security utilities (auth.utils.test.ts — password hashing, timing-safe comparison, access & refresh token signing, verification, expiration, tampering, and secret boundary isolation)
+* [ ] Authentication service logic
 * [ ] Authorization logic
 * [ ] RBAC logic
 * [ ] Employee services
@@ -1435,20 +1438,23 @@ Current Phase:
 Phase 2 — Authentication (In Progress)
 
 Overall Status:
-Phase 1 complete; Phase 2 in progress (P2-1.1 completed)
+Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1 completed)
 
 Completed Features:
 - Project foundation (client, server, env, health check)
 - Authentication database foundation (PostgreSQL + Prisma 7, User model, initial migration, PrismaClient integration)
+- Authentication module scaffold & security utilities (bcrypt password hashing, JWT access & refresh tokens)
+- Authentication utility unit tests (14 tests covering password hashing, JWT tokens, expirations, tampering, and secret boundaries)
+- User registration API (POST /api/v1/auth/register with Zod validation, duplicate email check, bcrypt password hashing, and safe user data return)
 
 In Progress:
-- Phase 2 — Authentication (P2-1.2: Authentication Module and Security Utilities)
+- Phase 2 — Authentication (US-2: P2-2.2 — Add User Registration API Tests)
 
 Blocked:
 0
 
 Next Objective:
-P2-1.2 — Set Up Authentication Module and Security Utilities
+P2-2.2 — Add User Registration API Tests
 ```
 
 ---

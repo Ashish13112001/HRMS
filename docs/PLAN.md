@@ -461,11 +461,11 @@ updatedAt
 
 **Depends on:** P2-2.1
 
-* [ ] Success
-* [ ] Invalid request data
-* [ ] Duplicate email
-* [ ] Password stored as hash and not returned
-* [ ] Correct HTTP status codes and error shape
+* [x] Success
+* [x] Invalid request data
+* [x] Duplicate email
+* [x] Password stored as hash and not returned
+* [x] Correct HTTP status codes and error shape
 
 **Acceptance**
 
@@ -482,13 +482,13 @@ updatedAt
 
 **Depends on:** P2-1.2
 
-* [ ] Zod validation
-* [ ] Find user by email and compare password hash
-* [ ] Reject invalid credentials with a generic error
-* [ ] Check user status where applicable
-* [ ] Issue access token and refresh token
-* [ ] Store refresh-token / session data needed for refresh and logout
-* [ ] Do not return sensitive user fields
+* [x] Zod validation
+* [x] Find user by email and compare password hash
+* [x] Reject invalid credentials with a generic error
+* [x] Check user status where applicable
+* [x] Issue access token and refresh token
+* [x] Store refresh-token / session data needed for refresh and logout
+* [x] Do not return sensitive user fields
 
 **Acceptance**
 
@@ -501,11 +501,11 @@ updatedAt
 
 **Depends on:** P2-3.1
 
-* [ ] Successful login
-* [ ] Incorrect password
-* [ ] Unknown email
-* [ ] Invalid request data
-* [ ] Tokens returned; sensitive fields omitted; generic error for bad credentials
+* [x] Successful login
+* [x] Incorrect password
+* [x] Unknown email
+* [x] Invalid request data
+* [x] Tokens returned; sensitive fields omitted; generic error for bad credentials
 
 **Acceptance**
 

@@ -197,13 +197,15 @@ Implement secure user authentication.
 * [x] **P2-1.2 — Set Up Authentication Module and Security Utilities**: Created auth module scaffold (routes/controller/service) mounted at `/api/v1/auth`. Implemented reusable bcrypt password hashing and comparison utilities, and jsonwebtoken access/refresh token generation and verification using environment variables.
 * [x] **P2-1.3 — Add Authentication Utility Unit Tests**: Comprehensive unit tests added in `auth.utils.test.ts` covering password hashing, unique salting, constant-time comparison, access token creation/verification, refresh token creation/verification, token expiration, secret boundary isolation, and tampered token rejection (14/14 tests passing).
 * [x] **P2-2.1 — Implement User Registration API**: Created `POST /api/v1/auth/register` with Zod validation (`validateBody(registerSchema)`), duplicate email check (409 Conflict), bcrypt password hashing, and sensitive field omission from the 201 response.
-* [ ] P2-2.2 — Add User Registration API Tests
+* [x] **P2-2.2 — Add User Registration API Tests**: Integration tests in `auth.test.ts` covering registration success (201), email normalization (trimming, lowercase), PostgreSQL persistence, password hashing verification and sensitive field exclusion, input validation errors (400 VALIDATION_ERROR for missing/empty email, invalid email format, missing password, short password), and duplicate email conflict rejection (409 CONFLICT) (11/11 tests passing).
+* [x] **P2-3.1 — Implement User Login with JWT Authentication**: Created `POST /api/v1/auth/login` with Zod validation (`loginSchema`), timing-safe password hash verification, account active status check (403 FORBIDDEN), generic invalid credentials error (401 UNAUTHORIZED) preventing email enumeration, access and refresh token issuance, database persistence of refresh token sessions (`RefreshToken` model & migration `20261027045452_add_refresh_tokens`), and sensitive field exclusion.
+* [x] **P2-3.2 — Add Login API Tests**: Integration tests in `auth.test.ts` covering login success (200), token issuance (`accessToken` & `refreshToken`), JWT claims verification, PostgreSQL session persistence, email normalization, password/hash omission, incorrect password (401 UNAUTHORIZED), unknown email (401 UNAUTHORIZED generic error preventing email enumeration), inactive user status (403 FORBIDDEN), and input validation (400 VALIDATION_ERROR) (12/12 login tests passing, 23/23 auth tests total).
 
 
 ### Implementation Tasks
 
 * [x] User registration
-* [ ] User login
+* [x] User login
 * [x] Password hashing
 * [x] JWT access token
 * [x] Refresh token strategy
@@ -213,14 +215,14 @@ Implement secure user authentication.
 * [ ] Forgot password
 * [ ] Reset password
 * [x] Authentication validation
-* [ ] Authentication error handling
+* [x] Authentication error handling
 
 ### API Implementation
 
 | Method | Endpoint                       | Status      |
 | ------ | ------------------------------ | ----------- |
 | POST   | `/api/v1/auth/register`        | Implemented |
-| POST   | `/api/v1/auth/login`           | Not Started |
+| POST   | `/api/v1/auth/login`           | Implemented |
 | POST   | `/api/v1/auth/logout`          | Not Started |
 | POST   | `/api/v1/auth/refresh`         | Not Started |
 | POST   | `/api/v1/auth/forgot-password` | Not Started |
@@ -759,7 +761,7 @@ Base API path:
 | Endpoint                | Method | Status      |
 | ----------------------- | ------ | ----------- |
 | `/auth/register`        | POST   | Implemented |
-| `/auth/login`           | POST   | Not Started |
+| `/auth/login`           | POST   | Implemented |
 | `/auth/logout`          | POST   | Not Started |
 | `/auth/refresh`         | POST   | Not Started |
 | `/auth/forgot-password` | POST   | Not Started |
@@ -1025,7 +1027,7 @@ server/src/
 
 * [x] Health endpoint
 * [x] Database & Prisma User model integration (prisma.test.ts)
-* [ ] Authentication endpoints
+* [x] Authentication registration & login endpoints (auth.test.ts)
 * [ ] Organization endpoints
 * [ ] User endpoints
 * [ ] Employee endpoints
@@ -1438,7 +1440,7 @@ Current Phase:
 Phase 2 — Authentication (In Progress)
 
 Overall Status:
-Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1 completed)
+Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2 completed)
 
 Completed Features:
 - Project foundation (client, server, env, health check)
@@ -1446,15 +1448,18 @@ Completed Features:
 - Authentication module scaffold & security utilities (bcrypt password hashing, JWT access & refresh tokens)
 - Authentication utility unit tests (14 tests covering password hashing, JWT tokens, expirations, tampering, and secret boundaries)
 - User registration API (POST /api/v1/auth/register with Zod validation, duplicate email check, bcrypt password hashing, and safe user data return)
+- User registration API integration tests (11 tests covering success 201, normalization, password omission & hashing, 400 validation error shapes, and 409 duplicate email conflict)
+- User login API & refresh token session persistence (POST /api/v1/auth/login with Zod validation, generic credential error, user status check, access/refresh token issuance, and database RefreshToken storage)
+- User login API integration tests (12 tests covering success 200, JWT claims, DB session storage, 401 generic error email enumeration defense, 403 inactive account check, and 400 input validation)
 
 In Progress:
-- Phase 2 — Authentication (US-2: P2-2.2 — Add User Registration API Tests)
+- Phase 2 — Authentication (US-4: P2-4.1 — Implement Refresh Token Flow and Rotation)
 
 Blocked:
 0
 
 Next Objective:
-P2-2.2 — Add User Registration API Tests
+P2-4.1 — Implement Refresh Token Flow and Rotation
 ```
 
 ---

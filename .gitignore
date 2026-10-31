@@ -22,3 +22,6 @@ Thumbs.db
 .idea/
 *.swp
 .eslintcache
+
+# TODO: review whether to commit or ignore AI agent skills and configuration
+.agents/

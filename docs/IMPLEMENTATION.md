@@ -200,6 +200,8 @@ Implement secure user authentication.
 * [x] **P2-2.2 — Add User Registration API Tests**: Integration tests in `auth.test.ts` covering registration success (201), email normalization (trimming, lowercase), PostgreSQL persistence, password hashing verification and sensitive field exclusion, input validation errors (400 VALIDATION_ERROR for missing/empty email, invalid email format, missing password, short password), and duplicate email conflict rejection (409 CONFLICT) (11/11 tests passing).
 * [x] **P2-3.1 — Implement User Login with JWT Authentication**: Created `POST /api/v1/auth/login` with Zod validation (`loginSchema`), timing-safe password hash verification, account active status check (403 FORBIDDEN), generic invalid credentials error (401 UNAUTHORIZED) preventing email enumeration, access and refresh token issuance, database persistence of refresh token sessions (`RefreshToken` model & migration `20261027045452_add_refresh_tokens`), and sensitive field exclusion.
 * [x] **P2-3.2 — Add Login API Tests**: Integration tests in `auth.test.ts` covering login success (200), token issuance (`accessToken` & `refreshToken`), JWT claims verification, PostgreSQL session persistence, email normalization, password/hash omission, incorrect password (401 UNAUTHORIZED), unknown email (401 UNAUTHORIZED generic error preventing email enumeration), inactive user status (403 FORBIDDEN), and input validation (400 VALIDATION_ERROR) (12/12 login tests passing, 23/23 auth tests total).
+* [x] **P2-4.1 — Implement Refresh Token Flow and Rotation**: Implemented `POST /api/v1/auth/refresh` with Zod validation (`refreshTokenSchema`), JWT signature verification, PostgreSQL refresh token lookup, status and expiration validation, atomic token rotation (invalidating old refresh token and persisting new session via Prisma transaction), active user account verification (403 FORBIDDEN), and automatic reuse detection that revokes all active sessions for the user family upon detecting an already-revoked token.
+* [x] **P2-4.2 — Add Refresh Token Tests**: Integration tests in `auth.test.ts` covering successful token refresh and rotation (200), claims verification, PostgreSQL session state persistence, old token invalidation, reuse attack prevention with automatic cascade revocation of compromised sessions, malformed/tampered token rejection, untrusted secret rejection, unpersisted token rejection, expired database token rejection, inactive user rejection (403), and input validation (9/9 refresh tests passing, 32/32 auth tests total).
 
 
 ### Implementation Tasks
@@ -224,7 +226,7 @@ Implement secure user authentication.
 | POST   | `/api/v1/auth/register`        | Implemented |
 | POST   | `/api/v1/auth/login`           | Implemented |
 | POST   | `/api/v1/auth/logout`          | Not Started |
-| POST   | `/api/v1/auth/refresh`         | Not Started |
+| POST   | `/api/v1/auth/refresh`         | Implemented |
 | POST   | `/api/v1/auth/forgot-password` | Not Started |
 | POST   | `/api/v1/auth/reset-password`  | Not Started |
 
@@ -763,7 +765,7 @@ Base API path:
 | `/auth/register`        | POST   | Implemented |
 | `/auth/login`           | POST   | Implemented |
 | `/auth/logout`          | POST   | Not Started |
-| `/auth/refresh`         | POST   | Not Started |
+| `/auth/refresh`         | POST   | Implemented |
 | `/auth/forgot-password` | POST   | Not Started |
 | `/auth/reset-password`  | POST   | Not Started |
 
@@ -1440,7 +1442,7 @@ Current Phase:
 Phase 2 — Authentication (In Progress)
 
 Overall Status:
-Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2 completed)
+Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2, P2-4.1, P2-4.2 completed)
 
 Completed Features:
 - Project foundation (client, server, env, health check)
@@ -1451,15 +1453,17 @@ Completed Features:
 - User registration API integration tests (11 tests covering success 201, normalization, password omission & hashing, 400 validation error shapes, and 409 duplicate email conflict)
 - User login API & refresh token session persistence (POST /api/v1/auth/login with Zod validation, generic credential error, user status check, access/refresh token issuance, and database RefreshToken storage)
 - User login API integration tests (12 tests covering success 200, JWT claims, DB session storage, 401 generic error email enumeration defense, 403 inactive account check, and 400 input validation)
+- Refresh token API with automatic rotation & reuse detection (POST /api/v1/auth/refresh with Zod validation, JWT verification, PostgreSQL session check, atomic invalidation + new pair issuance, and compromised session family cascade revocation)
+- Refresh token integration tests (9 tests covering 200 rotation, PostgreSQL state updates, reuse attack prevention, cascade revocation, malformed/tampered tokens, expired tokens, inactive user 403, and 400 validation)
 
 In Progress:
-- Phase 2 — Authentication (US-4: P2-4.1 — Implement Refresh Token Flow and Rotation)
+- Phase 2 — Authentication (US-5: P2-5.1 — Implement Authentication Middleware and Protected `/me` API)
 
 Blocked:
 0
 
 Next Objective:
-P2-4.1 — Implement Refresh Token Flow and Rotation
+P2-5.1 — Implement Authentication Middleware and Protected `/me` API
 ```
 
 ---

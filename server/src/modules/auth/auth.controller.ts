@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { successResponse } from '../../utils/apiResponse.js';
-import type { LoginInput, RegisterInput } from './auth.schema.js';
-import { loginUser, registerUser } from './auth.service.js';
+import type { LoginInput, RefreshTokenInput, RegisterInput } from './auth.schema.js';
+import { loginUser, refreshUserToken, registerUser } from './auth.service.js';
 
 /**
  * Handle user registration request (POST /api/v1/auth/register).
@@ -38,6 +38,27 @@ export async function login(
   try {
     const result = await loginUser(req.body);
     res.status(200).json(successResponse(result, 'Login successful'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Handle token refresh request (POST /api/v1/auth/refresh).
+ * Accepts refresh token, validates against DB, rotates it, and issues fresh tokens.
+ *
+ * @param req - Express request containing validated RefreshTokenInput in body
+ * @param res - Express response
+ * @param next - Express next function
+ */
+export async function refresh(
+  req: Request<unknown, unknown, RefreshTokenInput>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await refreshUserToken(req.body);
+    res.status(200).json(successResponse(result, 'Tokens refreshed successfully'));
   } catch (error) {
     next(error);
   }

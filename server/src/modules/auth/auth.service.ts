@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../../config/prisma.js';
 import { AppError } from '../../utils/appError.js';
-import type { LoginInput, RegisterInput } from './auth.schema.js';
+import type { LoginInput, RefreshTokenInput, RegisterInput } from './auth.schema.js';
 import { comparePassword, hashPassword } from './utils/password.js';
 import {
   createAccessToken,
@@ -30,6 +30,12 @@ export interface AuthTokens {
 export interface LoginResult {
   user: UserSafe;
   tokens: AuthTokens;
+}
+
+export interface RefreshResult {
+  tokens: AuthTokens;
+  accessToken: string;
+  refreshToken: string;
 }
 
 /**
@@ -138,6 +144,106 @@ export async function loginUser(input: LoginInput): Promise<LoginResult> {
       accessToken,
       refreshToken,
     },
+  };
+}
+
+/**
+ * Refresh authentication tokens using an existing refresh token with automatic rotation.
+ * Verifies JWT signature, validates token status in PostgreSQL, checks for reuse/revocation,
+ * checks user account active status, and atomically revokes the old token while issuing a new pair.
+ *
+ * If reuse is detected (attempting to use an already revoked token), all active tokens for the user
+ * are immediately revoked to protect against compromised session theft.
+ *
+ * @param input - Validated refresh token input
+ * @returns Promise resolving to newly generated tokens
+ * @throws AppError(401, 'UNAUTHORIZED') if token is invalid, expired, revoked, or reused
+ * @throws AppError(403, 'FORBIDDEN') if user account is inactive
+ */
+export async function refreshUserToken(input: RefreshTokenInput): Promise<RefreshResult> {
+  let payload: RefreshTokenPayload;
+
+  try {
+    payload = verifyRefreshToken(input.refreshToken);
+  } catch {
+    throw new AppError(401, 'Invalid or expired refresh token', 'UNAUTHORIZED');
+  }
+
+  const storedToken = await prisma.refreshToken.findUnique({
+    where: { token: input.refreshToken },
+    include: { user: true },
+  });
+
+  if (!storedToken || !storedToken.user) {
+    throw new AppError(401, 'Invalid or expired refresh token', 'UNAUTHORIZED');
+  }
+
+  // Reuse Detection: If an already-revoked token is used, compromise is detected!
+  if (storedToken.revokedAt !== null) {
+    // Invalidate all active refresh tokens for this user family as a security precaution
+    await prisma.refreshToken.updateMany({
+      where: {
+        userId: storedToken.userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    throw new AppError(401, 'Invalid or expired refresh token', 'UNAUTHORIZED');
+  }
+
+  // User status check
+  if (storedToken.user.status !== 'ACTIVE') {
+    throw new AppError(403, 'Your account is inactive. Please contact support.', 'FORBIDDEN');
+  }
+
+  // Expiration check against DB expiresAt
+  if (storedToken.expiresAt.getTime() <= Date.now()) {
+    throw new AppError(401, 'Invalid or expired refresh token', 'UNAUTHORIZED');
+  }
+
+  // Generate new access and refresh tokens
+  const newAccessToken = createAccessToken({
+    userId: storedToken.user.id,
+    email: storedToken.user.email,
+    role: storedToken.user.role,
+    organizationId: storedToken.user.organizationId,
+  });
+
+  const newTokenId = randomUUID();
+  const newRefreshToken = createRefreshToken({
+    userId: storedToken.user.id,
+    tokenId: newTokenId,
+  });
+
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  // Atomic rotation: invalidate previous refresh token & persist new refresh token
+  await prisma.$transaction(async (tx) => {
+    await tx.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { revokedAt: new Date() },
+    });
+
+    await tx.refreshToken.create({
+      data: {
+        id: newTokenId,
+        token: newRefreshToken,
+        userId: storedToken.user.id,
+        expiresAt,
+      },
+    });
+  });
+
+  return {
+    tokens: {
+      accessToken: newAccessToken,
+      refreshToken: newRefreshToken,
+    },
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
   };
 }
 

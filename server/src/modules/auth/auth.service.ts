@@ -247,6 +247,38 @@ export async function refreshUserToken(input: RefreshTokenInput): Promise<Refres
   };
 }
 
+/**
+ * Retrieve the current authenticated user's profile details.
+ *
+ * @param userId - The ID of the authenticated user
+ * @returns Promise resolving to safe user fields
+ * @throws AppError(401, 'UNAUTHORIZED') if the user no longer exists
+ * @throws AppError(403, 'FORBIDDEN') if the user account is inactive
+ */
+export async function getCurrentUser(userId: string): Promise<UserSafe> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new AppError(401, 'User does not exist', 'UNAUTHORIZED');
+  }
+
+  if (user.status !== 'ACTIVE') {
+    throw new AppError(403, 'Your account is inactive. Please contact support.', 'FORBIDDEN');
+  }
+
+  return {
+    id: user.id,
+    email: user.email,
+    status: user.status,
+    organizationId: user.organizationId,
+    role: user.role,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+  };
+}
+
 export {
   comparePassword,
   hashPassword,

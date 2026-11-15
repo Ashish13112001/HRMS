@@ -557,10 +557,10 @@ updatedAt
 
 **Depends on:** P2-3.1
 
-* [ ] Auth middleware: read Bearer token, verify JWT, attach user to the request
-* [ ] Reject missing, invalid, or expired tokens
-* [ ] Protect `GET /api/v1/auth/me`
-* [ ] Keep `GET /api/v1/health` public
+* [x] Auth middleware: read Bearer token, verify JWT, attach user to the request
+* [x] Reject missing, invalid, or expired tokens
+* [x] Protect `GET /api/v1/auth/me`
+* [x] Keep `GET /api/v1/health` public
 
 **Acceptance**
 
@@ -573,9 +573,9 @@ updatedAt
 
 **Depends on:** P2-5.1
 
-* [ ] No token, malformed Bearer, invalid JWT, expired JWT, valid JWT
-* [ ] `/auth/me` returns the authenticated user
-* [ ] `/health` works without authentication
+* [x] No token, malformed Bearer, invalid JWT, expired JWT, valid JWT
+* [x] `/auth/me` returns the authenticated user
+* [x] `/health` works without authentication
 
 **Acceptance**
 

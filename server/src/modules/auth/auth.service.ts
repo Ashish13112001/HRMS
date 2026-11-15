@@ -1,7 +1,14 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { prisma } from '../../config/prisma.js';
 import { AppError } from '../../utils/appError.js';
-import type { LoginInput, LogoutInput, RefreshTokenInput, RegisterInput } from './auth.schema.js';
+import type {
+  ForgotPasswordInput,
+  LoginInput,
+  LogoutInput,
+  RefreshTokenInput,
+  RegisterInput,
+  ResetPasswordInput,
+} from './auth.schema.js';
 import { comparePassword, hashPassword } from './utils/password.js';
 import {
   createAccessToken,
@@ -300,6 +307,136 @@ export async function logoutUser(input: LogoutInput): Promise<void> {
     });
   }
 }
+
+/**
+ * Handle forgot password request.
+ * Generates a one-time cryptographically secure reset token,
+ * persists only its SHA-256 hash with an expiration time,
+ * and returns the raw token internally (for delivery/testing).
+ *
+ * To prevent account enumeration, non-existent or inactive emails
+ * complete silently without raising errors or creating tokens.
+ *
+ * @param input - Validated forgot password input (email)
+ * @returns Promise resolving to object containing raw resetToken if generated
+ */
+export async function requestPasswordReset(
+  input: ForgotPasswordInput,
+): Promise<{ resetToken?: string }> {
+  const user = await prisma.user.findUnique({
+    where: { email: input.email },
+  });
+
+  // To prevent user enumeration attacks, if user is not found or inactive,
+  // do not leak their status. Silently return without generating a token.
+  if (!user || user.status !== 'ACTIVE') {
+    return {};
+  }
+
+  // Invalidate any existing unused reset tokens for this user
+  await prisma.passwordResetToken.updateMany({
+    where: {
+      userId: user.id,
+      usedAt: null,
+    },
+    data: {
+      usedAt: new Date(),
+    },
+  });
+
+  // Generate secure random plain token (32 bytes = 64 hex characters)
+  const rawResetToken = randomBytes(32).toString('hex');
+
+  // Hash the token with SHA-256 before persisting (only hash is stored in database)
+  const tokenHash = createHash('sha256').update(rawResetToken).digest('hex');
+
+  // 1-hour expiration
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+
+  await prisma.passwordResetToken.create({
+    data: {
+      tokenHash,
+      userId: user.id,
+      expiresAt,
+    },
+  });
+
+  return { resetToken: rawResetToken };
+}
+
+/**
+ * Handle reset password request.
+ * Validates the plain reset token against the stored SHA-256 hash in PostgreSQL,
+ * verifies it has not expired and has not already been used,
+ * updates the user's password with a fresh bcrypt hash,
+ * invalidates the reset token, and revokes all active refresh token sessions.
+ *
+ * @param input - Validated reset password input (plain token and new password)
+ * @returns Promise resolving to void
+ * @throws AppError(400, 'BAD_REQUEST') if token is invalid, expired, or already used
+ * @throws AppError(403, 'FORBIDDEN') if the associated user account is inactive
+ */
+export async function resetUserPassword(input: ResetPasswordInput): Promise<void> {
+  const tokenHash = createHash('sha256').update(input.token).digest('hex');
+
+  const storedToken = await prisma.passwordResetToken.findUnique({
+    where: { tokenHash },
+    include: { user: true },
+  });
+
+  if (!storedToken) {
+    throw new AppError(400, 'Invalid or expired password reset token', 'BAD_REQUEST');
+  }
+
+  // Reject already-used tokens
+  if (storedToken.usedAt !== null) {
+    throw new AppError(400, 'Password reset token has already been used', 'BAD_REQUEST');
+  }
+
+  // Reject expired tokens
+  if (storedToken.expiresAt.getTime() <= Date.now()) {
+    throw new AppError(400, 'Password reset token has expired', 'BAD_REQUEST');
+  }
+
+  // Check user account status
+  if (storedToken.user.status !== 'ACTIVE') {
+    throw new AppError(403, 'Your account is inactive. Please contact support.', 'FORBIDDEN');
+  }
+
+  // Hash the new password using bcrypt
+  const passwordHash = await hashPassword(input.password);
+
+  // Atomically invalidate reset token, update user passwordHash, and revoke active sessions
+  await prisma.$transaction(async (tx) => {
+    // Invalidate the reset token
+    await tx.passwordResetToken.update({
+      where: { id: storedToken.id },
+      data: { usedAt: new Date() },
+    });
+
+    // Update user's password hash
+    await tx.user.update({
+      where: { id: storedToken.userId },
+      data: { passwordHash },
+    });
+
+    // Revoke all existing refresh token sessions for security
+    await tx.refreshToken.updateMany({
+      where: {
+        userId: storedToken.userId,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+  });
+}
+
+export {
+  requestPasswordReset as forgotPassword,
+  resetUserPassword as resetPassword,
+};
 
 export {
   comparePassword,

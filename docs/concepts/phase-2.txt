@@ -109,3 +109,39 @@ Instant session revocation on the server side, idempotent and safe execution, cl
 
 What are the alternatives, if any?
 Client-side only token deletion (unsafe if token was intercepted); server-side blocklisting of all active JWT access tokens in Redis (heavier operational complexity than needed for MVP).
+
+============================================================================================================================================
+One-time password reset token & hashed persistence
+
+What is it?
+A secure mechanism to allow users who forgot their credentials to set a new password using a time-limited, single-use token.
+
+What does it do?
+Generates a cryptographically random plain token for the user, but stores only its cryptographic SHA-256 hash in PostgreSQL with a 1-hour expiration timestamp. When submitted, the token is verified, marked as used (`usedAt = NOW()`), and the user's password is updated with bcrypt.
+
+Why do we need it?
+If plain reset tokens were stored in the database and the database leaked, an attacker could immediately reset any user's password. Hashing the token protects accounts even in the event of a database compromise.
+
+What are its benefits?
+Zero plain-text token storage, single-use enforcement preventing token replay, short expiration window, and automatic session revocation upon password change.
+
+What are the alternatives, if any?
+Storing plain tokens in the database (insecure); short-lived signed JWT reset tokens (stateless, but harder to revoke immediately after one use without a blacklist).
+
+============================================================================================================================================
+User enumeration defense (Generic recovery responses)
+
+What is it?
+An authentication security practice where endpoints return the identical response message regardless of whether an account exists.
+
+What does it do?
+`POST /api/v1/auth/forgot-password` returns `200 OK` with "If an account with that email exists, password reset instructions have been sent" whether the email exists in PostgreSQL or not.
+
+Why do we need it?
+If the API returned `404 User Not Found`, malicious actors could automate requests to discover which email addresses belong to registered employees or admins in the system.
+
+What are its benefits?
+Prevents attacker reconnaissance and user profiling while preserving a clear and friendly user experience for legitimate users.
+
+What are the alternatives, if any?
+Explicit error messages like "Email does not exist" (creates severe email enumeration vulnerabilities).

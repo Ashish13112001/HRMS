@@ -202,6 +202,8 @@ Implement secure user authentication.
 * [x] **P2-3.2 — Add Login API Tests**: Integration tests in `auth.test.ts` covering login success (200), token issuance (`accessToken` & `refreshToken`), JWT claims verification, PostgreSQL session persistence, email normalization, password/hash omission, incorrect password (401 UNAUTHORIZED), unknown email (401 UNAUTHORIZED generic error preventing email enumeration), inactive user status (403 FORBIDDEN), and input validation (400 VALIDATION_ERROR) (12/12 login tests passing, 23/23 auth tests total).
 * [x] **P2-4.1 — Implement Refresh Token Flow and Rotation**: Implemented `POST /api/v1/auth/refresh` with Zod validation (`refreshTokenSchema`), JWT signature verification, PostgreSQL refresh token lookup, status and expiration validation, atomic token rotation (invalidating old refresh token and persisting new session via Prisma transaction), active user account verification (403 FORBIDDEN), and automatic reuse detection that revokes all active sessions for the user family upon detecting an already-revoked token.
 * [x] **P2-4.2 — Add Refresh Token Tests**: Integration tests in `auth.test.ts` covering successful token refresh and rotation (200), claims verification, PostgreSQL session state persistence, old token invalidation, reuse attack prevention with automatic cascade revocation of compromised sessions, malformed/tampered token rejection, untrusted secret rejection, unpersisted token rejection, expired database token rejection, inactive user rejection (403), and input validation (9/9 refresh tests passing, 32/32 auth tests total).
+* [x] **P2-5.1 — Implement Authentication Middleware and Protected `/me` API**: Implemented centralized `authenticate` Express middleware in `middleware/authenticate.ts` that parses Bearer authorization headers, cryptographically validates JWT access tokens, rejects missing/malformed/invalid/expired tokens (401 UNAUTHORIZED), and attaches verified identity claims to `req.user`. Created `GET /api/v1/auth/me` protected endpoint returning safe user profile fields while keeping `/api/v1/health` and public auth routes open.
+* [x] **P2-5.2 — Add Authentication Middleware Tests**: Integration tests in `auth.test.ts` covering successful profile retrieval (200), sensitive field omission (password/hash exclusion), missing Authorization header (401), non-Bearer authorization scheme (401), empty Bearer token (401), malformed JWT (401), untrusted secret token (401), refresh token in place of access token cross-token isolation (401), expired access token (401), inactive account guard (403), and public endpoint verification ensuring `/api/v1/health` remains accessible without authentication (10/10 tests passing, 42/42 auth tests total).
 
 
 ### Implementation Tasks
@@ -211,8 +213,8 @@ Implement secure user authentication.
 * [x] Password hashing
 * [x] JWT access token
 * [x] Refresh token strategy
-* [ ] Authentication middleware
-* [ ] Protected routes
+* [x] Authentication middleware
+* [x] Protected routes
 * [ ] Logout
 * [ ] Forgot password
 * [ ] Reset password
@@ -229,13 +231,14 @@ Implement secure user authentication.
 | POST   | `/api/v1/auth/refresh`         | Implemented |
 | POST   | `/api/v1/auth/forgot-password` | Not Started |
 | POST   | `/api/v1/auth/reset-password`  | Not Started |
+| GET    | `/api/v1/auth/me`              | Implemented |
 
 ### Security Verification
 
 * [ ] Passwords are never stored as plain text
-* [ ] Protected endpoints require authentication
+* [x] Protected endpoints require authentication
 * [ ] Invalid credentials are rejected
-* [ ] Invalid/expired tokens are rejected
+* [x] Invalid/expired tokens are rejected
 * [ ] Sensitive information is not returned in API responses
 
 ---
@@ -768,6 +771,7 @@ Base API path:
 | `/auth/refresh`         | POST   | Implemented |
 | `/auth/forgot-password` | POST   | Not Started |
 | `/auth/reset-password`  | POST   | Not Started |
+| `/auth/me`              | GET    | Implemented |
 
 ## Organizations
 
@@ -1442,7 +1446,7 @@ Current Phase:
 Phase 2 — Authentication (In Progress)
 
 Overall Status:
-Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2, P2-4.1, P2-4.2 completed)
+Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2, P2-4.1, P2-4.2, P2-5.1, P2-5.2 completed)
 
 Completed Features:
 - Project foundation (client, server, env, health check)
@@ -1455,15 +1459,18 @@ Completed Features:
 - User login API integration tests (12 tests covering success 200, JWT claims, DB session storage, 401 generic error email enumeration defense, 403 inactive account check, and 400 input validation)
 - Refresh token API with automatic rotation & reuse detection (POST /api/v1/auth/refresh with Zod validation, JWT verification, PostgreSQL session check, atomic invalidation + new pair issuance, and compromised session family cascade revocation)
 - Refresh token integration tests (9 tests covering 200 rotation, PostgreSQL state updates, reuse attack prevention, cascade revocation, malformed/tampered tokens, expired tokens, inactive user 403, and 400 validation)
+- Authentication middleware (centralized authenticate middleware verifying Bearer tokens, rejecting expired/malformed/invalid tokens, attaching user payload to req.user)
+- Protected /me API (GET /api/v1/auth/me returning safe user profile while keeping /health public)
+- Authentication middleware and /me API integration tests (10 tests covering 200 profile retrieval, sensitive field omission, 401 missing/malformed/expired tokens, 403 inactive account, and public /health endpoint)
 
 In Progress:
-- Phase 2 — Authentication (US-5: P2-5.1 — Implement Authentication Middleware and Protected `/me` API)
+- Phase 2 — Authentication (US-6: P2-6.1 — Implement User Logout and Session Invalidation)
 
 Blocked:
 0
 
 Next Objective:
-P2-5.1 — Implement Authentication Middleware and Protected `/me` API
+P2-6.1 — Implement User Logout and Session Invalidation
 ```
 
 ---

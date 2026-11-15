@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createApp } from '../../app.js';
 import { prisma } from '../../config/prisma.js';
 import { comparePassword, hashPassword } from './utils/password.js';
-import { createRefreshToken, verifyAccessToken, verifyRefreshToken } from './utils/token.js';
+import { createAccessToken, createRefreshToken, verifyAccessToken, verifyRefreshToken } from './utils/token.js';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
 
@@ -573,7 +573,6 @@ describe('POST /api/v1/auth/refresh (P2-4.1 / P2-4.2)', () => {
         },
       },
     });
-    await prisma.$disconnect();
   });
 
   describe('Successful Refresh and Rotation', () => {
@@ -837,3 +836,220 @@ describe('POST /api/v1/auth/refresh (P2-4.1 / P2-4.2)', () => {
     });
   });
 });
+
+describe('GET /api/v1/auth/me & Authentication Middleware (P2-5.1 / P2-5.2)', () => {
+  const timestamp = Date.now();
+  const meUserEmail = `test-me-${timestamp}@example.com`;
+  const rawPassword = 'ValidPassword123!';
+  const inactiveMeEmail = `test-me-inactive-${timestamp}@example.com`;
+  let activeUserId: string;
+  let inactiveUserId: string;
+  let validAccessToken: string;
+
+  beforeAll(async () => {
+    const passwordHash = await hashPassword(rawPassword);
+
+    const activeUser = await prisma.user.create({
+      data: {
+        email: meUserEmail,
+        passwordHash,
+        status: 'ACTIVE',
+      },
+    });
+    activeUserId = activeUser.id;
+
+    const inactiveUser = await prisma.user.create({
+      data: {
+        email: inactiveMeEmail,
+        passwordHash,
+        status: 'INACTIVE',
+      },
+    });
+    inactiveUserId = inactiveUser.id;
+
+    // Login to get a valid access token
+    const loginResponse = await request(app)
+      .post('/api/v1/auth/login')
+      .send({
+        email: meUserEmail,
+        password: rawPassword,
+      });
+    validAccessToken = loginResponse.body.data.tokens.accessToken;
+  });
+
+  afterAll(async () => {
+    // Clean up test users and refresh tokens
+    await prisma.refreshToken.deleteMany({
+      where: {
+        user: {
+          email: {
+            contains: 'test-me-',
+          },
+        },
+      },
+    });
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          contains: 'test-me-',
+        },
+      },
+    });
+    await prisma.$disconnect();
+  });
+
+  describe('Successful Profile Retrieval', () => {
+    it('returns 200 and the authenticated user profile when a valid Bearer token is provided', async () => {
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${validAccessToken}`);
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toBe('User profile retrieved successfully');
+
+      const user = response.body.data.user;
+      expect(user).toBeDefined();
+      expect(user.id).toBe(activeUserId);
+      expect(user.email).toBe(meUserEmail);
+      expect(user.status).toBe('ACTIVE');
+      expect(user.organizationId).toBeNull();
+      expect(user.role).toBeNull();
+      expect(user.createdAt).toBeDefined();
+      expect(user.updatedAt).toBeDefined();
+
+      // Ensure sensitive credentials are never exposed
+      expect(user.password).toBeUndefined();
+      expect(user.passwordHash).toBeUndefined();
+      expect(JSON.stringify(response.body)).not.toContain('passwordHash');
+    });
+  });
+
+  describe('Authentication Failure & Rejections', () => {
+    it('returns 401 UNAUTHORIZED when Authorization header is missing', async () => {
+      const response = await request(app).get('/api/v1/auth/me');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Authorization header is required',
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 UNAUTHORIZED when Authorization header does not use Bearer scheme', async () => {
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Basic ${validAccessToken}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Invalid authorization format. Format must be: Bearer <token>',
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 UNAUTHORIZED when Bearer token is empty or whitespace', async () => {
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', 'Bearer ');
+
+      expect(response.status).toBe(401);
+      expect(response.body.code).toBe('UNAUTHORIZED');
+    });
+
+    it('returns 401 UNAUTHORIZED when token is malformed', async () => {
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', 'Bearer invalid-token-string');
+
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Invalid access token',
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 UNAUTHORIZED when token is signed with untrusted secret', async () => {
+      const foreignToken = jwt.sign(
+        { userId: activeUserId, email: meUserEmail },
+        'untrusted-secret-key-1234567890',
+        { expiresIn: '15m' },
+      );
+
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${foreignToken}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Invalid access token',
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('returns 401 UNAUTHORIZED when a refresh token is supplied instead of an access token', async () => {
+      const refreshToken = createRefreshToken({
+        userId: activeUserId,
+        tokenId: randomUUID(),
+      });
+
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${refreshToken}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body.code).toBe('UNAUTHORIZED');
+    });
+
+    it('returns 401 UNAUTHORIZED when access token has expired', async () => {
+      const expiredToken = createAccessToken(
+        { userId: activeUserId, email: meUserEmail },
+        -1, // expired immediately
+      );
+
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${expiredToken}`);
+
+      expect(response.status).toBe(401);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Access token has expired',
+        code: 'UNAUTHORIZED',
+      });
+    });
+
+    it('returns 403 FORBIDDEN when user account is inactive', async () => {
+      const inactiveUserToken = createAccessToken({
+        userId: inactiveUserId,
+        email: inactiveMeEmail,
+      });
+
+      const response = await request(app)
+        .get('/api/v1/auth/me')
+        .set('Authorization', `Bearer ${inactiveUserToken}`);
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Your account is inactive. Please contact support.',
+        code: 'FORBIDDEN',
+      });
+    });
+  });
+
+  describe('Public Endpoint Isolation', () => {
+    it('allows access to public /api/v1/health without any authentication header', async () => {
+      const response = await request(app).get('/api/v1/health');
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.status).toBe('ok');
+    });
+  });
+});
+

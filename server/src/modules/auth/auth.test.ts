@@ -895,7 +895,6 @@ describe('GET /api/v1/auth/me & Authentication Middleware (P2-5.1 / P2-5.2)', ()
         },
       },
     });
-    await prisma.$disconnect();
   });
 
   describe('Successful Profile Retrieval', () => {
@@ -1052,4 +1051,202 @@ describe('GET /api/v1/auth/me & Authentication Middleware (P2-5.1 / P2-5.2)', ()
     });
   });
 });
+
+describe('POST /api/v1/auth/logout (P2-6.1 / P2-6.2)', () => {
+  const timestamp = Date.now();
+  const logoutUserEmail = `test-logout-${timestamp}@example.com`;
+  const rawPassword = 'ValidPassword123!';
+  let activeUserId: string;
+
+  beforeAll(async () => {
+    const passwordHash = await hashPassword(rawPassword);
+
+    const activeUser = await prisma.user.create({
+      data: {
+        email: logoutUserEmail,
+        passwordHash,
+        status: 'ACTIVE',
+      },
+    });
+    activeUserId = activeUser.id;
+  });
+
+  afterAll(async () => {
+    // Clean up test users and refresh tokens
+    await prisma.refreshToken.deleteMany({
+      where: {
+        user: {
+          email: {
+            contains: 'test-logout-',
+          },
+        },
+      },
+    });
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          contains: 'test-logout-',
+        },
+      },
+    });
+    await prisma.$disconnect();
+  });
+
+  describe('Successful Logout and Session Invalidation', () => {
+    it('revokes the refresh token session in PostgreSQL and returns 200', async () => {
+      // 1. Login to obtain tokens
+      const loginResponse = await request(app)
+        .post('/api/v1/auth/login')
+        .send({
+          email: logoutUserEmail,
+          password: rawPassword,
+        });
+
+      expect(loginResponse.status).toBe(200);
+      const { refreshToken } = loginResponse.body.data.tokens;
+
+      // 2. Perform logout
+      const logoutResponse = await request(app)
+        .post('/api/v1/auth/logout')
+        .send({
+          refreshToken,
+        });
+
+      expect(logoutResponse.status).toBe(200);
+      expect(logoutResponse.body.success).toBe(true);
+      expect(logoutResponse.body.message).toBe('Logged out successfully');
+
+      // 3. Verify in PostgreSQL that the token has been marked revoked
+      const storedToken = await prisma.refreshToken.findUnique({
+        where: { token: refreshToken },
+      });
+      expect(storedToken).not.toBeNull();
+      expect(storedToken?.revokedAt).not.toBeNull();
+    });
+
+    it('ensures that a logged-out refresh token cannot be refreshed', async () => {
+      // 1. Login to get a fresh refresh token
+      const loginResponse = await request(app)
+        .post('/api/v1/auth/login')
+        .send({
+          email: logoutUserEmail,
+          password: rawPassword,
+        });
+
+      const { refreshToken } = loginResponse.body.data.tokens;
+
+      // 2. Logout
+      const logoutResponse = await request(app)
+        .post('/api/v1/auth/logout')
+        .send({ refreshToken });
+      expect(logoutResponse.status).toBe(200);
+
+      // 3. Attempt to refresh with the logged-out token
+      const refreshResponse = await request(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken });
+
+      expect(refreshResponse.status).toBe(401);
+      expect(refreshResponse.body.code).toBe('UNAUTHORIZED');
+      expect(refreshResponse.body.message).toBe('Invalid or expired refresh token');
+    });
+  });
+
+  describe('Idempotent & Safe Logout Handling', () => {
+    it('handles already-revoked refresh token sessions gracefully', async () => {
+      // 1. Login
+      const loginResponse = await request(app)
+        .post('/api/v1/auth/login')
+        .send({
+          email: logoutUserEmail,
+          password: rawPassword,
+        });
+      const { refreshToken } = loginResponse.body.data.tokens;
+
+      // 2. First logout
+      await request(app)
+        .post('/api/v1/auth/logout')
+        .send({ refreshToken });
+
+      // 3. Second logout with the same token should safely succeed (idempotent)
+      const repeatLogout = await request(app)
+        .post('/api/v1/auth/logout')
+        .send({ refreshToken });
+
+      expect(repeatLogout.status).toBe(200);
+      expect(repeatLogout.body.success).toBe(true);
+      expect(repeatLogout.body.message).toBe('Logged out successfully');
+    });
+
+    it('handles unpersisted or malformed refresh token strings safely', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/logout')
+        .send({
+          refreshToken: 'non-existent-or-unpersisted-token-string',
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toBe('Logged out successfully');
+    });
+
+    it('handles expired refresh tokens safely', async () => {
+      const tokenId = randomUUID();
+      const expiredToken = createRefreshToken({
+        userId: activeUserId,
+        tokenId,
+      });
+
+      await prisma.refreshToken.create({
+        data: {
+          id: tokenId,
+          token: expiredToken,
+          userId: activeUserId,
+          expiresAt: new Date(Date.now() - 60000), // in the past
+        },
+      });
+
+      const response = await request(app)
+        .post('/api/v1/auth/logout')
+        .send({
+          refreshToken: expiredToken,
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.success).toBe(true);
+      expect(response.body.message).toBe('Logged out successfully');
+    });
+  });
+
+  describe('Validation & Error Handling', () => {
+    it('returns 400 VALIDATION_ERROR when refreshToken is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/logout')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: expect.stringContaining('Refresh token is required'),
+        code: 'VALIDATION_ERROR',
+      });
+    });
+
+    it('returns 400 VALIDATION_ERROR when refreshToken is an empty string', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/logout')
+        .send({
+          refreshToken: '',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: expect.stringContaining('Refresh token is required'),
+        code: 'VALIDATION_ERROR',
+      });
+    });
+  });
+});
+
 

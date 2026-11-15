@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { prisma } from '../../config/prisma.js';
 import { AppError } from '../../utils/appError.js';
-import type { LoginInput, RefreshTokenInput, RegisterInput } from './auth.schema.js';
+import type { LoginInput, LogoutInput, RefreshTokenInput, RegisterInput } from './auth.schema.js';
 import { comparePassword, hashPassword } from './utils/password.js';
 import {
   createAccessToken,
@@ -277,6 +277,28 @@ export async function getCurrentUser(userId: string): Promise<UserSafe> {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
   };
+}
+
+/**
+ * Invalidate an active refresh token session, logging the user out.
+ * Idempotent and safe: if the token is already expired, revoked, or not found,
+ * it safely completes so the client can clear its local session state.
+ *
+ * @param input - Validated logout input containing the refresh token
+ * @returns Promise resolving to void
+ */
+export async function logoutUser(input: LogoutInput): Promise<void> {
+  const storedToken = await prisma.refreshToken.findUnique({
+    where: { token: input.refreshToken },
+  });
+
+  // If token exists and is currently active, revoke it
+  if (storedToken && storedToken.revokedAt === null) {
+    await prisma.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { revokedAt: new Date() },
+    });
+  }
 }
 
 export {

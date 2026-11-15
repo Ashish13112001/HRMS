@@ -522,11 +522,11 @@ updatedAt
 
 **Depends on:** P2-3.1
 
-* [ ] Accept and verify the refresh token
-* [ ] Reject expired, invalid, revoked, or reused tokens
-* [ ] Rotate refresh token when required
-* [ ] Issue a new access token
-* [ ] Store new session state and invalidate the previous refresh token
+* [x] Accept and verify the refresh token
+* [x] Reject expired, invalid, revoked, or reused tokens
+* [x] Rotate refresh token when required
+* [x] Issue a new access token
+* [x] Store new session state and invalidate the previous refresh token
 
 **Acceptance**
 
@@ -539,9 +539,9 @@ updatedAt
 
 **Depends on:** P2-4.1
 
-* [ ] Successful refresh
-* [ ] Invalid, expired, and revoked tokens
-* [ ] Rotation; old token cannot be reused
+* [x] Successful refresh
+* [x] Invalid, expired, and revoked tokens
+* [x] Rotation; old token cannot be reused
 
 **Acceptance**
 

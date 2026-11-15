@@ -5,7 +5,8 @@ import { prisma } from '../../config/prisma.js';
 import { comparePassword, hashPassword } from './utils/password.js';
 import { createAccessToken, createRefreshToken, verifyAccessToken, verifyRefreshToken } from './utils/token.js';
 import jwt from 'jsonwebtoken';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { requestPasswordReset } from './auth.service.js';
 
 const app = createApp();
 
@@ -1089,7 +1090,6 @@ describe('POST /api/v1/auth/logout (P2-6.1 / P2-6.2)', () => {
         },
       },
     });
-    await prisma.$disconnect();
   });
 
   describe('Successful Logout and Session Invalidation', () => {
@@ -1248,5 +1248,326 @@ describe('POST /api/v1/auth/logout (P2-6.1 / P2-6.2)', () => {
     });
   });
 });
+
+describe('POST /api/v1/auth/forgot-password & reset-password (P2-7.1 / P2-7.2)', () => {
+  const timestamp = Date.now();
+  const activeUserEmail = `test-reset-active-${timestamp}@example.com`;
+  const inactiveUserEmail = `test-reset-inactive-${timestamp}@example.com`;
+  const initialPassword = 'InitialPassword123!';
+  const newPassword = 'NewSecretPassword456!';
+  let activeUserId: string;
+  let inactiveUserId: string;
+
+  beforeAll(async () => {
+    const passwordHash = await hashPassword(initialPassword);
+
+    const activeUser = await prisma.user.create({
+      data: {
+        email: activeUserEmail,
+        passwordHash,
+        status: 'ACTIVE',
+      },
+    });
+    activeUserId = activeUser.id;
+
+    const inactiveUser = await prisma.user.create({
+      data: {
+        email: inactiveUserEmail,
+        passwordHash,
+        status: 'INACTIVE',
+      },
+    });
+    inactiveUserId = inactiveUser.id;
+  });
+
+  afterAll(async () => {
+    // Clean up password reset tokens, refresh tokens, and users
+    await prisma.passwordResetToken.deleteMany({
+      where: {
+        user: {
+          email: {
+            contains: 'test-reset-',
+          },
+        },
+      },
+    });
+    await prisma.refreshToken.deleteMany({
+      where: {
+        user: {
+          email: {
+            contains: 'test-reset-',
+          },
+        },
+      },
+    });
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          contains: 'test-reset-',
+        },
+      },
+    });
+    await prisma.$disconnect();
+  });
+
+  describe('POST /api/v1/auth/forgot-password', () => {
+    it('returns generic 200 response and persists hashed token for an active user', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ email: activeUserEmail });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        message: 'If an account with that email exists, password reset instructions have been sent.',
+        data: null,
+      });
+
+      // Verify that a token hash is stored in PostgreSQL (not plain text)
+      const storedTokens = await prisma.passwordResetToken.findMany({
+        where: { userId: activeUserId },
+      });
+      expect(storedTokens.length).toBeGreaterThanOrEqual(1);
+      const latestToken = storedTokens[storedTokens.length - 1];
+      expect(latestToken.tokenHash).toHaveLength(64); // SHA-256 hex digest
+      expect(latestToken.usedAt).toBeNull();
+      expect(latestToken.expiresAt.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('returns identical generic 200 response when the email does not exist (anti-enumeration)', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ email: `nonexistent-${timestamp}@example.com` });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        message: 'If an account with that email exists, password reset instructions have been sent.',
+        data: null,
+      });
+    });
+
+    it('returns identical generic 200 response when user account is inactive', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ email: inactiveUserEmail });
+
+      expect(response.status).toBe(200);
+      expect(response.body).toEqual({
+        success: true,
+        message: 'If an account with that email exists, password reset instructions have been sent.',
+        data: null,
+      });
+
+      // Confirm no reset token was created for the inactive user
+      const tokens = await prisma.passwordResetToken.findMany({
+        where: { userId: inactiveUserId },
+      });
+      expect(tokens).toHaveLength(0);
+    });
+
+    it('returns 400 VALIDATION_ERROR when email is invalid', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({ email: 'not-an-email' });
+
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('VALIDATION_ERROR');
+      expect(response.body.message).toContain('Invalid email address');
+    });
+
+    it('returns 400 VALIDATION_ERROR when email is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/forgot-password')
+        .send({});
+
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('VALIDATION_ERROR');
+      expect(response.body.message).toContain('Email is required');
+    });
+  });
+
+  describe('POST /api/v1/auth/reset-password', () => {
+    it('successfully resets password with a valid token, updates hash, and revokes active sessions', async () => {
+      // 1. Establish an active session before password reset
+      const loginBefore = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: activeUserEmail, password: initialPassword });
+      expect(loginBefore.status).toBe(200);
+      const oldRefreshToken = loginBefore.body.data.tokens.refreshToken;
+
+      // 2. Request a password reset token
+      const resetResult = await requestPasswordReset({ email: activeUserEmail });
+      expect(resetResult.resetToken).toBeDefined();
+      const rawToken = resetResult.resetToken!;
+
+      // 3. Reset password using the plain token
+      const resetResponse = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          token: rawToken,
+          password: newPassword,
+        });
+
+      expect(resetResponse.status).toBe(200);
+      expect(resetResponse.body).toEqual({
+        success: true,
+        message: 'Password has been reset successfully',
+        data: null,
+      });
+
+      // 4. Verify token is marked as used in PostgreSQL
+      const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+      const usedToken = await prisma.passwordResetToken.findUnique({
+        where: { tokenHash },
+      });
+      expect(usedToken?.usedAt).not.toBeNull();
+
+      // 5. Old password no longer works
+      const oldLoginResponse = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: activeUserEmail, password: initialPassword });
+      expect(oldLoginResponse.status).toBe(401);
+
+      // 6. New password works
+      const newLoginResponse = await request(app)
+        .post('/api/v1/auth/login')
+        .send({ email: activeUserEmail, password: newPassword });
+      expect(newLoginResponse.status).toBe(200);
+      expect(newLoginResponse.body.data.user.email).toBe(activeUserEmail);
+
+      // 7. Verify previous refresh session was revoked
+      const refreshResponse = await request(app)
+        .post('/api/v1/auth/refresh')
+        .send({ refreshToken: oldRefreshToken });
+      expect(refreshResponse.status).toBe(401);
+    });
+
+    it('rejects an already-used reset token with 400 BAD_REQUEST', async () => {
+      // 1. Generate token and use it once
+      const resetResult = await requestPasswordReset({ email: activeUserEmail });
+      const rawToken = resetResult.resetToken!;
+
+      const firstReset = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          token: rawToken,
+          password: 'AnotherPassword789!',
+        });
+      expect(firstReset.status).toBe(200);
+
+      // 2. Attempt to reuse the same token
+      const reusedResponse = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          token: rawToken,
+          password: 'YetAnotherPassword123!',
+        });
+
+      expect(reusedResponse.status).toBe(400);
+      expect(reusedResponse.body).toEqual({
+        success: false,
+        message: 'Password reset token has already been used',
+        code: 'BAD_REQUEST',
+      });
+    });
+
+    it('rejects an expired reset token with 400 BAD_REQUEST', async () => {
+      const expiredRawToken = randomBytes(32).toString('hex');
+      const expiredTokenHash = createHash('sha256').update(expiredRawToken).digest('hex');
+
+      await prisma.passwordResetToken.create({
+        data: {
+          tokenHash: expiredTokenHash,
+          userId: activeUserId,
+          expiresAt: new Date(Date.now() - 60000), // 1 minute in the past
+        },
+      });
+
+      const response = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          token: expiredRawToken,
+          password: 'ValidPassword999!',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Password reset token has expired',
+        code: 'BAD_REQUEST',
+      });
+    });
+
+    it('rejects an invalid or non-existent token with 400 BAD_REQUEST', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          token: 'invalid-nonexistent-token-value-00000000000000000000',
+          password: 'ValidPassword999!',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Invalid or expired password reset token',
+        code: 'BAD_REQUEST',
+      });
+    });
+
+    it('rejects password reset when user account is inactive with 403 FORBIDDEN', async () => {
+      const inactiveRawToken = randomBytes(32).toString('hex');
+      const inactiveTokenHash = createHash('sha256').update(inactiveRawToken).digest('hex');
+
+      await prisma.passwordResetToken.create({
+        data: {
+          tokenHash: inactiveTokenHash,
+          userId: inactiveUserId,
+          expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        },
+      });
+
+      const response = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          token: inactiveRawToken,
+          password: 'ValidPassword999!',
+        });
+
+      expect(response.status).toBe(403);
+      expect(response.body).toEqual({
+        success: false,
+        message: 'Your account is inactive. Please contact support.',
+        code: 'FORBIDDEN',
+      });
+    });
+
+    it('returns 400 VALIDATION_ERROR when token is missing', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          password: 'ValidPassword999!',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('VALIDATION_ERROR');
+      expect(response.body.message).toContain('Reset token is required');
+    });
+
+    it('returns 400 VALIDATION_ERROR when password is too short', async () => {
+      const response = await request(app)
+        .post('/api/v1/auth/reset-password')
+        .send({
+          token: 'some-token',
+          password: 'short',
+        });
+
+      expect(response.status).toBe(400);
+      expect(response.body.code).toBe('VALIDATION_ERROR');
+      expect(response.body.message).toContain('Password must be at least 8 characters long');
+    });
+  });
+});
+
 
 

@@ -206,6 +206,8 @@ Implement secure user authentication.
 * [x] **P2-5.2 — Add Authentication Middleware Tests**: Integration tests in `auth.test.ts` covering successful profile retrieval (200), sensitive field omission (password/hash exclusion), missing Authorization header (401), non-Bearer authorization scheme (401), empty Bearer token (401), malformed JWT (401), untrusted secret token (401), refresh token in place of access token cross-token isolation (401), expired access token (401), inactive account guard (403), and public endpoint verification ensuring `/api/v1/health` remains accessible without authentication (10/10 tests passing, 42/42 auth tests total).
 * [x] **P2-6.1 — Implement User Logout and Session Invalidation**: Implemented `POST /api/v1/auth/logout` with Zod validation (`logoutSchema`), PostgreSQL session lookup, and token revocation (`revokedAt = NOW()`), safely and idempotently handling already-invalid, expired, or unpersisted sessions.
 * [x] **P2-6.2 — Add Logout and Session Invalidation Tests**: Integration tests in `auth.test.ts` covering successful logout (200), PostgreSQL token revocation verification, refresh rejection after logout (401), idempotent repeated logout handling, expired token logout handling, unpersisted token logout handling, and input validation errors (7/7 tests passing, 49/49 auth tests total).
+* [x] **P2-7.1 — Implement Forgot and Reset Password APIs**: Implemented `POST /api/v1/auth/forgot-password` and `POST /api/v1/auth/reset-password` with Zod validation. Forgot-password returns a generic success response regardless of account existence to defend against user enumeration attacks, generates a cryptographically secure 32-byte one-time token, and stores only its SHA-256 hash in PostgreSQL (`PasswordResetToken` model) with a 1-hour expiration window. Reset-password validates the token hash against PostgreSQL, rejects expired or already-used tokens, hashes the new password with bcrypt, updates the user record, marks the token used (`usedAt = NOW()`), and revokes all active refresh token sessions in an atomic transaction.
+* [x] **P2-7.2 — Add Password Recovery Tests**: Comprehensive integration tests in `auth.test.ts` covering forgot-password generic response for existing, non-existent, and inactive accounts (200), token hash database persistence, validation errors (400), successful password reset (200), bcrypt password update verification, previous password rejection on login (401), new password login success (200), revocation of active refresh sessions, reused token rejection (400), expired token rejection (400), invalid/non-existent token rejection (400), inactive user rejection (403), and input validation (11/11 tests passing, 60/60 auth tests total, 80/80 tests across all suites).
 
 
 ### Implementation Tasks
@@ -218,8 +220,8 @@ Implement secure user authentication.
 * [x] Authentication middleware
 * [x] Protected routes
 * [x] Logout
-* [ ] Forgot password
-* [ ] Reset password
+* [x] Forgot password
+* [x] Reset password
 * [x] Authentication validation
 * [x] Authentication error handling
 
@@ -231,17 +233,17 @@ Implement secure user authentication.
 | POST   | `/api/v1/auth/login`           | Implemented |
 | POST   | `/api/v1/auth/logout`          | Implemented |
 | POST   | `/api/v1/auth/refresh`         | Implemented |
-| POST   | `/api/v1/auth/forgot-password` | Not Started |
-| POST   | `/api/v1/auth/reset-password`  | Not Started |
+| POST   | `/api/v1/auth/forgot-password` | Implemented |
+| POST   | `/api/v1/auth/reset-password`  | Implemented |
 | GET    | `/api/v1/auth/me`              | Implemented |
 
 ### Security Verification
 
-* [ ] Passwords are never stored as plain text
+* [x] Passwords are never stored as plain text
 * [x] Protected endpoints require authentication
-* [ ] Invalid credentials are rejected
+* [x] Invalid credentials are rejected
 * [x] Invalid/expired tokens are rejected
-* [ ] Sensitive information is not returned in API responses
+* [x] Sensitive information is not returned in API responses
 
 ---
 
@@ -1448,7 +1450,7 @@ Current Phase:
 Phase 2 — Authentication (In Progress)
 
 Overall Status:
-Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2, P2-4.1, P2-4.2, P2-5.1, P2-5.2, P2-6.1, P2-6.2 completed)
+Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2, P2-4.1, P2-4.2, P2-5.1, P2-5.2, P2-6.1, P2-6.2, P2-7.1, P2-7.2 completed)
 
 Completed Features:
 - Project foundation (client, server, env, health check)
@@ -1466,15 +1468,17 @@ Completed Features:
 - Authentication middleware and /me API integration tests (10 tests covering 200 profile retrieval, sensitive field omission, 401 missing/malformed/expired tokens, 403 inactive account, and public /health endpoint)
 - User logout API & session invalidation (POST /api/v1/auth/logout with Zod validation, PostgreSQL token revocation, and safe idempotent handling of expired/invalid sessions)
 - User logout API integration tests (7 tests covering 200 logout, database revokedAt verification, post-logout refresh rejection 401, idempotent logout, expired/unpersisted token handling, and 400 validation)
+- Forgot password & Reset password APIs (POST /api/v1/auth/forgot-password with generic response defending against user enumeration, and POST /api/v1/auth/reset-password with SHA-256 hashed token persistence, 1-hour expiration, bcrypt password update, token invalidation, and session cascade revocation)
+- Password recovery integration tests (11 tests covering generic response for existing/missing/inactive emails, SHA-256 token hashing in DB, successful reset flow, old password invalidation, new password login, session revocation, used token rejection, expired token rejection, invalid token rejection, inactive user rejection, and input validation)
 
 In Progress:
-- Phase 2 — Authentication (US-7: P2-7.1 — Implement Forgot and Reset Password APIs)
+- Phase 2 — Authentication (US-8: Frontend Authentication Pages & State)
 
 Blocked:
 0
 
 Next Objective:
-P2-7.1 — Implement Forgot and Reset Password APIs
+P2-8.1 — Implement Signup and Login Pages
 ```
 
 ---

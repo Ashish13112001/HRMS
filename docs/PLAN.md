@@ -632,11 +632,11 @@ POST /api/v1/auth/reset-password
 
 **Depends on:** P2-1.2
 
-* [ ] Forgot-password: generic success whether or not the email exists
-* [ ] Generate a one-time reset token; persist only a hash; set expiry
-* [ ] Reset-password: validate token, hash new password, invalidate token
-* [ ] Reject expired or already-used tokens
-* [ ] Do not add a real email provider unless separately approved
+* [x] Forgot-password: generic success whether or not the email exists
+* [x] Generate a one-time reset token; persist only a hash; set expiry
+* [x] Reset-password: validate token, hash new password, invalidate token
+* [x] Reject expired or already-used tokens
+* [x] Do not add a real email provider unless separately approved
 
 **Acceptance**
 
@@ -651,10 +651,10 @@ POST /api/v1/auth/reset-password
 
 **Depends on:** P2-7.1
 
-* [ ] Forgot-password generic response for existing and missing emails
-* [ ] Successful reset
-* [ ] Invalid, expired, and reused tokens
-* [ ] New password stored as hash; old password no longer authenticates
+* [x] Forgot-password generic response for existing and missing emails
+* [x] Successful reset
+* [x] Invalid, expired, and reused tokens
+* [x] New password stored as hash; old password no longer authenticates
 
 **Acceptance**
 

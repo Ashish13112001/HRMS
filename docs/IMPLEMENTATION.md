@@ -204,6 +204,8 @@ Implement secure user authentication.
 * [x] **P2-4.2 — Add Refresh Token Tests**: Integration tests in `auth.test.ts` covering successful token refresh and rotation (200), claims verification, PostgreSQL session state persistence, old token invalidation, reuse attack prevention with automatic cascade revocation of compromised sessions, malformed/tampered token rejection, untrusted secret rejection, unpersisted token rejection, expired database token rejection, inactive user rejection (403), and input validation (9/9 refresh tests passing, 32/32 auth tests total).
 * [x] **P2-5.1 — Implement Authentication Middleware and Protected `/me` API**: Implemented centralized `authenticate` Express middleware in `middleware/authenticate.ts` that parses Bearer authorization headers, cryptographically validates JWT access tokens, rejects missing/malformed/invalid/expired tokens (401 UNAUTHORIZED), and attaches verified identity claims to `req.user`. Created `GET /api/v1/auth/me` protected endpoint returning safe user profile fields while keeping `/api/v1/health` and public auth routes open.
 * [x] **P2-5.2 — Add Authentication Middleware Tests**: Integration tests in `auth.test.ts` covering successful profile retrieval (200), sensitive field omission (password/hash exclusion), missing Authorization header (401), non-Bearer authorization scheme (401), empty Bearer token (401), malformed JWT (401), untrusted secret token (401), refresh token in place of access token cross-token isolation (401), expired access token (401), inactive account guard (403), and public endpoint verification ensuring `/api/v1/health` remains accessible without authentication (10/10 tests passing, 42/42 auth tests total).
+* [x] **P2-6.1 — Implement User Logout and Session Invalidation**: Implemented `POST /api/v1/auth/logout` with Zod validation (`logoutSchema`), PostgreSQL session lookup, and token revocation (`revokedAt = NOW()`), safely and idempotently handling already-invalid, expired, or unpersisted sessions.
+* [x] **P2-6.2 — Add Logout and Session Invalidation Tests**: Integration tests in `auth.test.ts` covering successful logout (200), PostgreSQL token revocation verification, refresh rejection after logout (401), idempotent repeated logout handling, expired token logout handling, unpersisted token logout handling, and input validation errors (7/7 tests passing, 49/49 auth tests total).
 
 
 ### Implementation Tasks
@@ -215,7 +217,7 @@ Implement secure user authentication.
 * [x] Refresh token strategy
 * [x] Authentication middleware
 * [x] Protected routes
-* [ ] Logout
+* [x] Logout
 * [ ] Forgot password
 * [ ] Reset password
 * [x] Authentication validation
@@ -227,7 +229,7 @@ Implement secure user authentication.
 | ------ | ------------------------------ | ----------- |
 | POST   | `/api/v1/auth/register`        | Implemented |
 | POST   | `/api/v1/auth/login`           | Implemented |
-| POST   | `/api/v1/auth/logout`          | Not Started |
+| POST   | `/api/v1/auth/logout`          | Implemented |
 | POST   | `/api/v1/auth/refresh`         | Implemented |
 | POST   | `/api/v1/auth/forgot-password` | Not Started |
 | POST   | `/api/v1/auth/reset-password`  | Not Started |
@@ -767,7 +769,7 @@ Base API path:
 | ----------------------- | ------ | ----------- |
 | `/auth/register`        | POST   | Implemented |
 | `/auth/login`           | POST   | Implemented |
-| `/auth/logout`          | POST   | Not Started |
+| `/auth/logout`          | POST   | Implemented |
 | `/auth/refresh`         | POST   | Implemented |
 | `/auth/forgot-password` | POST   | Not Started |
 | `/auth/reset-password`  | POST   | Not Started |
@@ -1446,7 +1448,7 @@ Current Phase:
 Phase 2 — Authentication (In Progress)
 
 Overall Status:
-Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2, P2-4.1, P2-4.2, P2-5.1, P2-5.2 completed)
+Phase 1 complete; Phase 2 in progress (P2-1.1, P2-1.2, P2-1.3, P2-2.1, P2-2.2, P2-3.1, P2-3.2, P2-4.1, P2-4.2, P2-5.1, P2-5.2, P2-6.1, P2-6.2 completed)
 
 Completed Features:
 - Project foundation (client, server, env, health check)
@@ -1462,15 +1464,17 @@ Completed Features:
 - Authentication middleware (centralized authenticate middleware verifying Bearer tokens, rejecting expired/malformed/invalid tokens, attaching user payload to req.user)
 - Protected /me API (GET /api/v1/auth/me returning safe user profile while keeping /health public)
 - Authentication middleware and /me API integration tests (10 tests covering 200 profile retrieval, sensitive field omission, 401 missing/malformed/expired tokens, 403 inactive account, and public /health endpoint)
+- User logout API & session invalidation (POST /api/v1/auth/logout with Zod validation, PostgreSQL token revocation, and safe idempotent handling of expired/invalid sessions)
+- User logout API integration tests (7 tests covering 200 logout, database revokedAt verification, post-logout refresh rejection 401, idempotent logout, expired/unpersisted token handling, and 400 validation)
 
 In Progress:
-- Phase 2 — Authentication (US-6: P2-6.1 — Implement User Logout and Session Invalidation)
+- Phase 2 — Authentication (US-7: P2-7.1 — Implement Forgot and Reset Password APIs)
 
 Blocked:
 0
 
 Next Objective:
-P2-6.1 — Implement User Logout and Session Invalidation
+P2-7.1 — Implement Forgot and Reset Password APIs
 ```
 
 ---

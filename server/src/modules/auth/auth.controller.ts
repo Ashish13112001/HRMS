@@ -1,8 +1,14 @@
 import type { NextFunction, Request, Response } from 'express';
 import { successResponse } from '../../utils/apiResponse.js';
 import { AppError } from '../../utils/appError.js';
-import type { LoginInput, RefreshTokenInput, RegisterInput } from './auth.schema.js';
-import { getCurrentUser, loginUser, refreshUserToken, registerUser } from './auth.service.js';
+import type { LoginInput, LogoutInput, RefreshTokenInput, RegisterInput } from './auth.schema.js';
+import {
+  getCurrentUser,
+  loginUser,
+  logoutUser,
+  refreshUserToken,
+  registerUser,
+} from './auth.service.js';
 
 /**
  * Handle user registration request (POST /api/v1/auth/register).
@@ -81,6 +87,27 @@ export async function getMe(req: Request, res: Response, next: NextFunction): Pr
 
     const user = await getCurrentUser(req.user.userId);
     res.status(200).json(successResponse({ user }, 'User profile retrieved successfully'));
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Handle user logout request (POST /api/v1/auth/logout).
+ * Revokes the refresh token session in PostgreSQL, preventing further token refreshes.
+ *
+ * @param req - Express request containing validated LogoutInput in body
+ * @param res - Express response
+ * @param next - Express next function
+ */
+export async function logout(
+  req: Request<unknown, unknown, LogoutInput>,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    await logoutUser(req.body);
+    res.status(200).json(successResponse(null, 'Logged out successfully'));
   } catch (error) {
     next(error);
   }

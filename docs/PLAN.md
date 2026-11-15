@@ -592,10 +592,10 @@ updatedAt
 
 **Depends on:** P2-4.1
 
-* [ ] Identify the refresh session
-* [ ] Revoke / invalidate the refresh token
-* [ ] Safe logout response
-* [ ] Handle already-invalid sessions appropriately
+* [x] Identify the refresh session
+* [x] Revoke / invalidate the refresh token
+* [x] Safe logout response
+* [x] Handle already-invalid sessions appropriately
 
 **Acceptance**
 
@@ -608,9 +608,9 @@ updatedAt
 
 **Depends on:** P2-6.1
 
-* [ ] Successful logout
-* [ ] Refresh fails after logout
-* [ ] Logout with invalid / expired session
+* [x] Successful logout
+* [x] Refresh fails after logout
+* [x] Logout with invalid / expired session
 
 **Acceptance**
 

@@ -91,3 +91,21 @@ Standardized user profile endpoint, verifies user account status (`ACTIVE`), and
 What are the alternatives, if any?
 Extracting user details only from the decoded JWT on the client side (can become stale if the user's role or status changes in the database).
 
+
+============================================================================================================================================
+Session invalidation and user logout
+
+What is it?
+A mechanism to explicitly terminate an authenticated user session by revoking the refresh token in PostgreSQL.
+
+What does it do?
+When a user logs out (`POST /api/v1/auth/logout`), the server marks the refresh token's `revokedAt` timestamp in the database, preventing it from ever being used again to issue new access tokens.
+
+Why do we need it?
+Stateless access tokens cannot be easily invalidated before their natural expiry (15 minutes). Revoking the underlying refresh token ensures that once logged out, no further access tokens can be minted for that session.
+
+What are its benefits?
+Instant session revocation on the server side, idempotent and safe execution, clean cleanup for frontend clients, and foundation for "logout from all devices".
+
+What are the alternatives, if any?
+Client-side only token deletion (unsafe if token was intercepted); server-side blocklisting of all active JWT access tokens in Redis (heavier operational complexity than needed for MVP).
